@@ -10,6 +10,12 @@ export const fromMin = (min: number): string =>
 
 export const ISO = 'yyyy-MM-dd';
 export const hoyReal = (): string => format(new Date(), ISO);
+/**
+ * Instante actual como ISO local. La fecha es la de "hoy" (posiblemente simulado);
+ * la hora es la simulada ("HH:mm") si hay, si no la real.
+ */
+export const ahoraISO = (hoy: string, horaSimulada?: string | null): string =>
+  `${hoy}T${horaSimulada ? `${horaSimulada}:00` : format(new Date(), 'HH:mm:ss')}`;
 export const sumarDias = (fecha: string, n: number): string => format(addDays(parseISO(fecha), n), ISO);
 
 /** Franja válida: desde < hasta. */

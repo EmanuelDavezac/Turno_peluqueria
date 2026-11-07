@@ -17,6 +17,7 @@
   --cerrado: 110 110 110; --cerrado-soft: 232 232 230;
 }
 [data-theme='dark'] {
+  color-scheme: dark;
   --bg: 22 21 19;
   --surface: 33 31 28;
   --sunken: 27 25 23;

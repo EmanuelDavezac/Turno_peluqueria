@@ -1,6 +1,6 @@
-import { BarChart3, CalendarDays, Clock, Cog, MessageCircle, Moon, Receipt, Sun, Tv, Users } from 'lucide-react';
+import { BarChart3, CalendarDays, Clock, Cog, MessageCircle, Moon, Receipt, Sun, Users } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { useHoy, useStore } from '@/data/local/store';
+import { useAhora, useHoy, useStore } from '@/data/local/store';
 import { hoyReal } from '@/lib/horas';
 
 const NAV = [
@@ -15,7 +15,8 @@ const NAV = [
 
 export function PanelLayout() {
   const hoy = useHoy();
-  const { tema, setTema, hoySimulado, setHoySimulado } = useStore();
+  const { tema, setTema, hoySimulado, setHoySimulado, horaSimulada, setHoraSimulada, resetDemo } = useStore();
+  const ahora = useAhora();
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[14rem_1fr]">
@@ -50,9 +51,6 @@ export function PanelLayout() {
           <a href="/reservas" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-mute hover:bg-sunken hover:text-ink">
             <CalendarDays size={16} /> Página de reservas
           </a>
-          <a href="/tv" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-mute hover:bg-sunken hover:text-ink">
-            <Tv size={16} /> Pantalla TV
-          </a>
           <button
             type="button"
             onClick={() => setTema(tema === 'claro' ? 'oscuro' : 'claro')}
@@ -75,11 +73,36 @@ export function PanelLayout() {
               className="rounded-md border border-line bg-surface px-2 py-1 text-ink"
             />
           </label>
-          {hoySimulado && hoySimulado !== hoyReal() && (
-            <button type="button" onClick={() => setHoySimulado(null)} className="font-semibold underline">
-              Volver a hoy real
+          <label className="flex items-center gap-2">
+            Simular hora:
+            <input
+              type="time"
+              value={ahora.slice(11, 16)}
+              onChange={(e) => setHoraSimulada(e.target.value || null)}
+              className="rounded-md border border-line bg-surface px-2 py-1 text-ink"
+            />
+          </label>
+          {((hoySimulado && hoySimulado !== hoyReal()) || horaSimulada) && (
+            <button
+              type="button"
+              onClick={() => {
+                setHoySimulado(null);
+                setHoraSimulada(null);
+              }}
+              className="font-semibold underline"
+            >
+              Volver a fecha y hora reales
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('Esto borra los datos cargados y vuelve a los datos de ejemplo. ¿Seguro?')) resetDemo();
+            }}
+            className="font-semibold underline"
+          >
+            Restablecer demo
+          </button>
         </div>
         <main className="p-4 md:p-8">
           <Outlet />

@@ -1,13 +1,16 @@
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { HorariosRepo } from '@/data/repositories';
 import { CLIENTES, PROFESIONALES, SEMANA_DEFAULT, SERVICIOS, generarSeed } from '@/data/seed';
+import { llamarSiguiente as elegirSiguiente, siguienteNumero } from '@/domain/fila';
 import type {
   Cliente, Cobro, EntradaFila, Excepcion, Profesional, Servicio, Turno,
 } from '@/domain/types';
-import { hoyReal, uid } from '@/lib/horas';
+import { ahoraISO, hoyReal, uid } from '@/lib/horas';
 
 export type Tema = 'claro' | 'oscuro';
+export type Medio = Cobro['medio'];
 
 interface Estado extends HorariosRepo {
   profesionales: Profesional[];
@@ -16,27 +19,59 @@ interface Estado extends HorariosRepo {
   turnos: Turno[];
   fila: EntradaFila[];
   cobros: Cobro[];
+  /** Fechas con la caja cerrada. */
+  cajasCerradas: string[];
   /** Solo demo: fecha simulada de "hoy" (null = fecha real). */
   hoySimulado: string | null;
+  /** Solo demo: hora simulada "HH:mm" (null = hora real). */
+  horaSimulada: string | null;
   tema: Tema;
+  local: { nombre: string; direccion: string };
+
+  /** Reserva de turno: reutiliza al cliente si el WhatsApp ya existe. */
+  reservar(d: {
+    fecha: string; hora: string; profesionalId: string; servicioId: string; nombre: string; whatsapp: string;
+    origen?: Turno['origen'];
+  }): Turno;
+  setEstadoTurno(id: string, estado: Turno['estado']): void;
+  /** Alta en la fila de hoy. Devuelve la entrada con su número. */
+  anotarFila(d: {
+    nombre?: string; whatsapp?: string; servicioId: string; profesionalPreferidoId?: string; origen?: EntradaFila['origen'];
+  }): EntradaFila;
+  salirDeFila(id: string): void;
+  marcarAusente(id: string): void;
+  /** Pasa al primero en espera que corresponda a ese profesional al sillón. */
+  llamarSiguiente(profesionalId: string): EntradaFila | undefined;
+  /** Termina la atención de la fila y registra el cobro. */
+  cobrarFila(id: string, medio: Medio, monto: number): void;
+  /** Marca el turno como atendido y registra el cobro. */
+  cobrarTurno(id: string, medio: Medio, monto: number): void;
+  cerrarCaja(fecha: string): void;
   /** Cancela turnos (regla 8). La notificación al cliente es simulada. */
   cancelarTurnos(ids: string[]): void;
   setHoySimulado(fecha: string | null): void;
+  setHoraSimulada(hora: string | null): void;
   setTema(t: Tema): void;
   resetDemo(): void;
 }
 
-function estadoInicial() {
+function estadoInicial(hoy = hoyReal(), ahora = ahoraISO(hoy)) {
   const semana = SEMANA_DEFAULT;
   const excepciones: Excepcion[] = [];
-  const seed = generarSeed(hoyReal(), semana, excepciones);
+  const seed = generarSeed(hoy, semana, excepciones, ahora);
   return {
     semana, excepciones,
     profesionales: PROFESIONALES, servicios: SERVICIOS, clientes: CLIENTES,
     turnos: seed.turnos, fila: seed.fila, cobros: seed.cobros,
+    cajasCerradas: [] as string[],
     hoySimulado: null as string | null,
+    horaSimulada: null as string | null,
   };
 }
+
+type Snap = Pick<Estado, 'hoySimulado' | 'horaSimulada'>;
+const hoyDe = (s: Snap) => s.hoySimulado ?? hoyReal();
+const ahoraDe = (s: Snap) => ahoraISO(hoyDe(s), s.horaSimulada);
 
 /**
  * Implementación fase 1 (localStorage). En fase 2 los componentes siguen
@@ -44,9 +79,87 @@ function estadoInicial() {
  */
 export const useStore = create<Estado>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...estadoInicial(),
       tema: 'claro',
+      local: { nombre: 'Peluquería (ejemplo)', direccion: 'Dirección de ejemplo, Esperanza, Santa Fe' },
+
+      reservar: (d) => {
+        const digitos = (w: string) => w.replace(/\D/g, '');
+        const dig = digitos(d.whatsapp);
+        const existente = dig ? get().clientes.find((c) => digitos(c.whatsapp) === dig) : undefined;
+        const cliente: Cliente = existente ?? { id: uid('c'), nombre: d.nombre, whatsapp: d.whatsapp };
+        const turno: Turno = {
+          id: uid('t'), fecha: d.fecha, hora: d.hora, profesionalId: d.profesionalId, servicioId: d.servicioId,
+          clienteId: cliente.id, estado: 'reservado', origen: d.origen ?? 'online',
+        };
+        set((s) => ({ clientes: existente ? s.clientes : [...s.clientes, cliente], turnos: [...s.turnos, turno] }));
+        return turno;
+      },
+
+      setEstadoTurno: (id, estado) =>
+        set((s) => ({ turnos: s.turnos.map((t) => (t.id === id ? { ...t, estado } : t)) })),
+
+      anotarFila: (d) => {
+        const s = get();
+        const hoy = hoyDe(s);
+        const entrada: EntradaFila = {
+          id: uid('f'), fecha: hoy, numero: siguienteNumero(s.fila, hoy), clienteNombre: d.nombre?.trim() || 'Sin nombre',
+          whatsapp: d.whatsapp || undefined, servicioId: d.servicioId, profesionalPreferidoId: d.profesionalPreferidoId,
+          estado: 'espera', origen: d.origen ?? 'online', ingresoAt: ahoraDe(s),
+        };
+        set({ fila: [...s.fila, entrada] });
+        return entrada;
+      },
+
+      salirDeFila: (id) =>
+        set((s) => ({ fila: s.fila.map((e) => (e.id === id && e.estado === 'espera' ? { ...e, estado: 'salio' as const } : e)) })),
+
+      marcarAusente: (id) =>
+        set((s) => ({ fila: s.fila.map((e) => (e.id === id && e.estado === 'espera' ? { ...e, estado: 'ausente' as const } : e)) })),
+
+      llamarSiguiente: (profesionalId) => {
+        const s = get();
+        const ocupado = s.fila.some((e) => e.fecha === hoyDe(s) && e.estado === 'atendiendo' && e.profesionalId === profesionalId);
+        if (ocupado) return undefined;
+        const sig = elegirSiguiente(s.fila, hoyDe(s), profesionalId);
+        if (!sig) return undefined;
+        const llamado: EntradaFila = { ...sig, estado: 'atendiendo', profesionalId, inicioAt: ahoraDe(s) };
+        set({ fila: s.fila.map((e) => (e.id === sig.id ? llamado : e)) });
+        return llamado;
+      },
+
+      cobrarFila: (id, medio, monto) => {
+        const s = get();
+        const e = s.fila.find((x) => x.id === id);
+        if (!e || e.estado !== 'atendiendo' || !e.profesionalId) return;
+        const ahora = ahoraDe(s);
+        const cobro: Cobro = {
+          id: uid('cb'), fecha: e.fecha, hora: ahora.slice(11, 16), profesionalId: e.profesionalId,
+          servicioId: e.servicioId, clienteNombre: e.clienteNombre, monto, medio, origen: 'llegada',
+        };
+        set({
+          fila: s.fila.map((x) => (x.id === id ? { ...x, estado: 'listo' as const, finAt: ahora } : x)),
+          cobros: [...s.cobros, cobro],
+        });
+      },
+
+      cobrarTurno: (id, medio, monto) => {
+        const s = get();
+        const t = s.turnos.find((x) => x.id === id);
+        if (!t || t.estado === 'atendido' || t.estado === 'cancelado') return;
+        const cliente = s.clientes.find((c) => c.id === t.clienteId);
+        const cobro: Cobro = {
+          id: uid('cb'), fecha: t.fecha, hora: ahoraDe(s).slice(11, 16), profesionalId: t.profesionalId,
+          servicioId: t.servicioId, clienteNombre: cliente?.nombre ?? 'Cliente', monto, medio, origen: 'turno',
+        };
+        set({
+          turnos: s.turnos.map((x) => (x.id === id ? { ...x, estado: 'atendido' as const } : x)),
+          cobros: [...s.cobros, cobro],
+        });
+      },
+
+      cerrarCaja: (fecha) => set((s) => ({ cajasCerradas: s.cajasCerradas.includes(fecha) ? s.cajasCerradas : [...s.cajasCerradas, fecha] })),
 
       setDia: (dia, cambios) =>
         set((s) => ({ semana: s.semana.map((d) => (d.dia === dia ? { ...d, ...cambios } : d)) })),
@@ -67,12 +180,34 @@ export const useStore = create<Estado>()(
         })),
 
       setHoySimulado: (fecha) => set({ hoySimulado: fecha }),
+      setHoraSimulada: (hora) => set({ horaSimulada: hora }),
       setTema: (tema) => set({ tema }),
-      resetDemo: () => set({ ...estadoInicial() }),
+      // Conserva la fecha/hora simuladas y ancla los datos de ejemplo a ellas.
+      resetDemo: () => {
+        const s = get();
+        set({ ...estadoInicial(hoyDe(s), ahoraDe(s)), hoySimulado: s.hoySimulado, horaSimulada: s.horaSimulada });
+      },
     }),
-    { name: 'turnero-pelu-v1' },
+    // v2: agrega hora simulada, cajas cerradas y nuevo seed. Sin migración: arranca limpio.
+    { name: 'turnero-pelu-v1', version: 2 },
   ),
 );
 
 /** "Hoy" efectivo: respeta la simulación de la demo. */
 export const useHoy = (): string => useStore((s) => s.hoySimulado ?? hoyReal());
+
+/**
+ * Instante actual (ISO local) respetando fecha y hora simuladas. Sin simulación
+ * de hora, se refresca solo cada 30 s para que la fila y la línea de "ahora" avancen.
+ */
+export function useAhora(): string {
+  const hoySim = useStore((s) => s.hoySimulado);
+  const horaSim = useStore((s) => s.horaSimulada);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (horaSim) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, [horaSim]);
+  return ahoraISO(hoySim ?? hoyReal(), horaSim);
+}

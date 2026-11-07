@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useStore } from '@/data/local/store';
+import { AgendaPage } from '@/features/agenda/AgendaPage';
+import { CajaPage } from '@/features/caja/CajaPage';
 import { HorariosPage } from '@/features/horarios/HorariosPage';
+import { ReservasPage } from '@/features/reservas/ReservasPage';
 import { PanelLayout } from '@/layouts/PanelLayout';
 
 function Proximamente({ titulo }: { titulo: string }) {
@@ -25,15 +28,14 @@ export default function App() {
       <Route path="/panel" element={<PanelLayout />}>
         <Route index element={<Navigate to="horarios" replace />} />
         <Route path="horarios" element={<HorariosPage />} />
-        <Route path="agenda" element={<Proximamente titulo="Agenda del día" />} />
-        <Route path="caja" element={<Proximamente titulo="Caja" />} />
+        <Route path="agenda" element={<AgendaPage />} />
+        <Route path="caja" element={<CajaPage />} />
         <Route path="clientes" element={<Proximamente titulo="Clientes" />} />
         <Route path="reportes" element={<Proximamente titulo="Reportes" />} />
         <Route path="recordatorios" element={<Proximamente titulo="Recordatorios" />} />
         <Route path="config" element={<Proximamente titulo="Configuración" />} />
       </Route>
-      <Route path="/reservas" element={<Proximamente titulo="Reservas" />} />
-      <Route path="/tv" element={<Proximamente titulo="Pantalla de la fila" />} />
+      <Route path="/reservas" element={<ReservasPage />} />
     </Routes>
   );
 }

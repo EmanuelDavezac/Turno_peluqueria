@@ -102,10 +102,12 @@ Secciones:
 - Servicios: nombre, duración, precio.
 - (Solo demo) "Simular fecha de hoy", para poder mostrar el modo viernes cualquier día de la semana.
 
-### 3. Pantalla de la fila (TV del local)
+### ~~3. Pantalla de la fila (TV del local)~~ — DESCARTADA
 
-- Vista a pantalla completa: "Atendiendo ahora" (número + nombre por profesional), "Próximos" (siguientes 5 números), espera estimada para quien llega ahora, y texto "Anotate desde tu celular en <link>".
-- Si hoy es día de turnos: "Hoy atendemos con turno".
+> Decisión: no se hace la pantalla TV. Se quitó la ruta `/tv` y los enlaces a ella.
+
+- ~~Vista a pantalla completa: "Atendiendo ahora" (número + nombre por profesional), "Próximos" (siguientes 5 números), espera estimada para quien llega ahora, y texto "Anotate desde tu celular en <link>".~~
+- ~~Si hoy es día de turnos: "Hoy atendemos con turno".~~
 
 ## Modelo de datos
 
@@ -167,7 +169,7 @@ interface Cobro {
 - Mobile-first en la página de reservas; panel cómodo en notebook y tablet.
 - Colores semánticos fijos por modalidad (turnos, llegada, mixto, cerrado) usados en todo el sistema: badges, tira de días, configuración.
 - Tema claro y oscuro.
-- Números de la fila grandes y legibles (pensar en la TV).
+- Números de la fila grandes y legibles ~~(pensar en la TV)~~.
 - Evitar el look genérico: tipografía con personalidad para títulos, paleta propia, nada de emojis como íconos.
 - Todo en español rioplatense ("vení", "anotate", "cobrá").
 
@@ -176,7 +178,7 @@ interface Cobro {
 - [ ] Puedo poner el viernes en "Orden de llegada" desde Horarios y la página de reservas lo refleja al instante.
 - [ ] Un cliente no puede sacar turno un viernes; ve el aviso y puede anotarse en la fila si es hoy.
 - [ ] Desde el panel llamo al siguiente, termino, cobro, y el cobro aparece en Caja y Reportes.
-- [ ] La pantalla TV se actualiza cuando llamo al siguiente (misma pestaña o `BroadcastChannel` entre pestañas).
+- [ ] ~~La pantalla TV se actualiza cuando llamo al siguiente (misma pestaña o `BroadcastChannel` entre pestañas).~~ (descartado con la pantalla TV)
 - [ ] Puedo cargar una excepción (feriado cerrado) y ese día aparece cerrado para el cliente.
 - [ ] Horario cortado funciona: no se ofrecen turnos en la siesta.
 - [ ] Funciona bien en celular (360–400 px).
@@ -184,7 +186,7 @@ interface Cobro {
 ## Fase 2 (después de que el dueño acepte)
 
 - Supabase: tablas del modelo, RLS, login del dueño y de cada profesional.
-- Realtime para la fila (panel, TV y celular del cliente sincronizados).
+- Realtime para la fila (panel y celular del cliente sincronizados; ~~TV~~).
 - Recordatorios: WhatsApp Cloud API o link `wa.me` prearmado.
 - Seña online con Mercado Pago (opcional).
 - Migración: importar clientes y servicios desde un export de AgendaPro (CSV).
