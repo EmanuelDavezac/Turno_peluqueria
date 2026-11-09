@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect, type ComponentType, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { BACKEND } from '@/data/backend';
 import { useStore } from '@/data/local/store';
 import { AgendaPage } from '@/features/agenda/AgendaPage';
 import { ClientesPage } from '@/features/clientes/ClientesPage';
@@ -12,6 +13,10 @@ import { ReservasPage } from '@/features/reservas/ReservasPage';
 import { PanelLayout } from '@/layouts/PanelLayout';
 import { PinGate } from '@/layouts/PinGate';
 
+// El login real (y supabase-js) solo se descarga cuando VITE_BACKEND=supabase.
+const LoginGate = lazy(() => import('@/layouts/LoginGate').then((m) => ({ default: m.LoginGate })));
+const Gate: ComponentType<{ children: ReactNode }> = BACKEND === 'supabase' ? LoginGate : PinGate;
+
 export default function App() {
   const tema = useStore((s) => s.tema);
   useEffect(() => {
@@ -21,7 +26,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/panel/horarios" replace />} />
-      <Route path="/panel" element={<PinGate><PanelLayout /></PinGate>}>
+      <Route path="/panel" element={<Suspense fallback={null}><Gate><PanelLayout /></Gate></Suspense>}>
         <Route index element={<Navigate to="horarios" replace />} />
         <Route path="horarios" element={<HorariosPage />} />
         <Route path="agenda" element={<AgendaPage />} />

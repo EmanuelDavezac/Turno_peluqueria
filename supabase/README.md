@@ -28,6 +28,23 @@ Si un test de concurrencia (`900_`) muere a mitad de camino puede dejar datos: `
 - La `service_role` key no va al frontend. Solo `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 - Signups desactivados (`[auth] enable_signup = false`). **En el proyecto remoto hay que desactivarlos también** (Authentication → Sign In / Providers).
 
+## Auth del panel: checklist del proyecto remoto
+
+`config.toml` solo rige el entorno local. En el proyecto remoto hay que hacerlo en el dashboard (o con `npx supabase config push`):
+
+1. **Authentication → Sign In / Providers → "Allow new users to sign up": desactivado.** Sin esto, cualquiera crea una cuenta (igual no entraría al panel, pero ensucia Auth).
+2. **Authentication → URL Configuration.** Si falta esto, el link de "olvidé mi contraseña" no vuelve a la app:
+   - *Site URL*: la URL de producción (por ejemplo `https://turnero-pelu.vercel.app`).
+   - *Redirect URLs*: `https://<tu-dominio>/panel` y `http://localhost:5173/panel`. Son exactas, sin comodines si se puede evitar.
+3. **SMTP propio** (Authentication → Emails → SMTP Settings). El correo integrado de Supabase es solo para probar: está muy limitado en cantidad y solo envía a miembros del equipo del proyecto. **Sin SMTP propio la recuperación de contraseña falla o no llega.** Alcanza con un proveedor transaccional (Resend, Brevo, Postmark, SES) y un remitente con dominio verificado (SPF/DKIM).
+4. Crear al dueño en **Authentication → Users → Add user** y habilitarlo en el panel:
+   ```sql
+   insert into usuarios_panel (user_id) values ('<uuid del usuario>') on conflict do nothing;
+   ```
+   Tener cuenta no alcanza: sin esa fila, el login muestra "no tiene acceso al panel".
+5. Contraseña mínima de 8 caracteres (el front la exige; en Authentication → Policies conviene subir el mínimo también).
+6. Recomendado: activar MFA (TOTP) para el dueño.
+
 ## Hora de Argentina
 
 `date` / `time` / `timestamp` sin zona, siempre hora local de Argentina (UTC-3, sin horario de verano). El reloj de negocio es `ahora_ar()` / `hoy_ar()`; el reloj del cliente nunca decide nada.
