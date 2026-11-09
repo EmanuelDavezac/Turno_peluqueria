@@ -44,6 +44,11 @@ export function ConfigPage() {
             <p aria-hidden>Dirección</p>
             <TextoInput className="mt-1" label="Dirección" value={local.direccion} onCommit={(v) => s.setLocal({ direccion: v })} />
           </div>
+          <div className="text-sm font-medium">
+            <p aria-hidden>PIN del panel</p>
+            <TextoInput className="mt-1" label="PIN para entrar al panel" value={local.pin} onCommit={(v) => s.setLocal({ pin: v.trim() })} />
+            <p className="mt-1 text-xs font-normal text-mute">Se pide al abrir el panel. Los clientes nunca lo ven.</p>
+          </div>
         </div>
       </Seccion>
 

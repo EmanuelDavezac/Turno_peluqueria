@@ -8,7 +8,7 @@ import { CUALQUIERA, slotsDisponibles, type Slot } from '@/domain/disponibilidad
 import { getDia } from '@/domain/getDia';
 import { DIAS_NOMBRE, DIAS_ORDEN, formatFranjas, permiteFila, permiteTurnos } from '@/domain/modalidad';
 import { armarMensaje } from '@/domain/recordatorio';
-import type { Turno } from '@/domain/types';
+import type { ConfigDia, Turno } from '@/domain/types';
 import { PublicLayout } from '@/layouts/PublicLayout';
 import { fechaLarga, formatARS } from '@/lib/format';
 import { sumarDias } from '@/lib/horas';
@@ -32,23 +32,45 @@ function Paso({ n, titulo, children }: { n: number; titulo: string; children: Re
   );
 }
 
+const DIA_CORTO = (d: number) => DIAS_NOMBRE[d].slice(0, 3);
+
+/** Agrupa días consecutivos con la misma modalidad y franjas: "Lun a Vie", "Sáb", "Dom". */
+function agruparSemana(semana: ConfigDia[]) {
+  const grupos: { desde: number; hasta: number; cfg: ConfigDia }[] = [];
+  for (const d of DIAS_ORDEN) {
+    const cfg = semana.find((x) => x.dia === d)!;
+    const ult = grupos[grupos.length - 1];
+    const igual = ult && ult.cfg.modalidad === cfg.modalidad && JSON.stringify(ult.cfg.franjas) === JSON.stringify(cfg.franjas);
+    if (igual) ult.hasta = d;
+    else grupos.push({ desde: d, hasta: d, cfg });
+  }
+  return grupos.map((g) => ({
+    ...g,
+    etiqueta: g.desde === g.hasta ? DIA_CORTO(g.desde) : `${DIA_CORTO(g.desde)} a ${DIA_CORTO(g.hasta)}`,
+  }));
+}
+
 export function ReservasPage() {
   const { semana, excepciones, servicios, profesionales, turnos, fila, local, recordatorios, reservar } = useStore();
   const hoy = useHoy();
   const ahora = useAhora();
 
   const [servicioId, setServicioId] = useState<string | null>(null);
-  const [profesionalId, setProfesionalId] = useState<string>(CUALQUIERA);
+  // El servicio elegido se muestra resumido; "Cambiar" vuelve a abrir la lista.
+  const [eligiendoServicio, setEligiendoServicio] = useState(true);
   const [fecha, setFecha] = useState<string | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [nombre, setNombre] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [error, setError] = useState('');
   const [turno, setTurno] = useState<Turno | null>(null);
+  const diaRef = useRef<HTMLDivElement>(null);
   const datosRef = useRef<HTMLDivElement>(null);
 
-  const activos = profesionales.filter((p) => p.activo);
+  // Un solo peluquero: no se elige profesional.
+  const profesionalId = CUALQUIERA;
   const servicio = servicios.find((s) => s.id === servicioId);
+  const grupos = useMemo(() => agruparSemana(semana), [semana]);
 
   const dias = useMemo(
     () => Array.from({ length: DIAS_VISIBLES }, (_, i) => getDia(sumarDias(hoy, i), semana, excepciones)),
@@ -75,6 +97,14 @@ export function ReservasPage() {
     if (slot) datosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [slot]);
 
+  const elegirServicio = (id: string) => {
+    setServicioId(id);
+    setSlot(null);
+    setEligiendoServicio(false);
+    // Espera al render del paso siguiente antes de desplazarse.
+    requestAnimationFrame(() => diaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
   const elegirSlot = (s: Slot) => {
     setSlot(s);
     setError('');
@@ -93,7 +123,7 @@ export function ReservasPage() {
   };
 
   const reiniciar = () => {
-    setTurno(null); setSlot(null); setFecha(null); setServicioId(null); setProfesionalId(CUALQUIERA);
+    setTurno(null); setSlot(null); setFecha(null); setServicioId(null); setEligiendoServicio(true);
     setNombre(''); setWhatsapp(''); setError('');
   };
 
@@ -101,17 +131,14 @@ export function ReservasPage() {
     <header className="mb-6">
       <h1 className="text-3xl font-bold leading-tight">{local.nombre}</h1>
       <p className="text-mute">{local.direccion}</p>
-      <ul className="mt-4 divide-y divide-line rounded-xl border border-line bg-surface text-sm" aria-label="Horarios de la semana">
-        {DIAS_ORDEN.map((d) => {
-          const c = semana.find((x) => x.dia === d)!;
-          return (
-            <li key={d} className="flex items-center gap-2 px-3 py-2">
-              <span className="w-24 font-semibold">{DIAS_NOMBRE[d]}</span>
-              <ModalidadBadge modalidad={c.modalidad} />
-              <span className="ml-auto text-right text-mute">{c.modalidad === 'cerrado' ? '' : formatFranjas(c.franjas)}</span>
-            </li>
-          );
-        })}
+      <ul className="mt-3 space-y-1 text-sm" aria-label="Horarios de la semana">
+        {grupos.map((g) => (
+          <li key={g.desde} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="w-24 shrink-0 font-semibold">{g.etiqueta}</span>
+            <ModalidadBadge modalidad={g.cfg.modalidad} />
+            {g.cfg.modalidad !== 'cerrado' && <span className="text-mute">{formatFranjas(g.cfg.franjas)}</span>}
+          </li>
+        ))}
       </ul>
     </header>
   );
@@ -131,7 +158,6 @@ export function ReservasPage() {
           <div className="rounded-2xl border border-line bg-surface p-4 text-left">
             <p className="text-lg font-bold">{servicio.nombre}</p>
             <p className="first-letter:uppercase">{fechaLarga(turno.fecha)} · {turno.hora} hs</p>
-            <p className="text-mute">Con {prof?.nombre}</p>
             <p className="mt-2 font-semibold">{formatARS(servicio.precio)}</p>
           </div>
           <div className="text-left">
@@ -153,45 +179,40 @@ export function ReservasPage() {
       {cabecera}
       <div className="space-y-8">
         <Paso n={1} titulo="¿Qué servicio querés?">
-          <div className="space-y-2">
-            {servicios.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                aria-pressed={s.id === servicioId}
-                className={opcion(s.id === servicioId)}
-                onClick={() => { setServicioId(s.id); setSlot(null); }}
-              >
-                <span className="flex items-baseline justify-between gap-2">
-                  <span className="font-semibold">{s.nombre}</span>
-                  <span className="font-semibold tabular-nums">{formatARS(s.precio)}</span>
-                </span>
-                <span className="text-sm text-mute">{s.duracionMin} min</span>
-              </button>
-            ))}
-          </div>
-        </Paso>
-
-        {servicio && (
-          <Paso n={2} titulo="¿Con quién?">
-            <div className="grid grid-cols-2 gap-2">
-              {[{ id: CUALQUIERA, nombre: 'Cualquiera' }, ...activos].map((p) => (
+          {servicio && !eligiendoServicio ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-brand bg-surface p-3">
+              <div>
+                <p className="font-semibold">{servicio.nombre}</p>
+                <p className="text-sm text-mute">{servicio.duracionMin} min · {formatARS(servicio.precio)}</p>
+              </div>
+              <Button variante="ghost" className="shrink-0" onClick={() => setEligiendoServicio(true)}>
+                Cambiar
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {servicios.map((s) => (
                 <button
-                  key={p.id}
+                  key={s.id}
                   type="button"
-                  aria-pressed={p.id === profesionalId}
-                  className={opcion(p.id === profesionalId)}
-                  onClick={() => { setProfesionalId(p.id); setSlot(null); }}
+                  aria-pressed={s.id === servicioId}
+                  className={opcion(s.id === servicioId)}
+                  onClick={() => elegirServicio(s.id)}
                 >
-                  <span className="font-semibold">{p.nombre}</span>
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="font-semibold">{s.nombre}</span>
+                    <span className="font-semibold tabular-nums">{formatARS(s.precio)}</span>
+                  </span>
+                  <span className="text-sm text-mute">{s.duracionMin} min</span>
                 </button>
               ))}
             </div>
-          </Paso>
-        )}
+          )}
+        </Paso>
 
         {servicio && (
-          <Paso n={3} titulo="¿Qué día?">
+          <div ref={diaRef} className="scroll-mt-4">
+          <Paso n={2} titulo="¿Qué día?">
             <TiraDias dias={dias} hoy={hoy} seleccionado={dia?.fecha ?? null} onElegir={(f) => { setFecha(f); setSlot(null); }} />
 
             {dia && (
@@ -218,7 +239,7 @@ export function ReservasPage() {
                       </div>
                     ) : (
                       <p className="rounded-xl border border-dashed border-line p-4 text-sm text-mute">
-                        No quedan horarios este día{profesionalId !== CUALQUIERA ? ' con este profesional. Probá con "Cualquiera" u otro día.' : '. Probá con otro día.'}
+                        No quedan horarios este día. Probá con otro día.
                       </p>
                     )}
                   </div>
@@ -244,11 +265,12 @@ export function ReservasPage() {
               </div>
             )}
           </Paso>
+          </div>
         )}
 
         {servicio && dia && slot && (
           <div ref={datosRef}>
-            <Paso n={4} titulo="Tus datos">
+            <Paso n={3} titulo="Tus datos">
               <div className="space-y-3 rounded-2xl border border-line bg-surface p-4">
                 <p className="text-sm text-mute">
                   {servicio.nombre} · <span className="first-letter:uppercase">{fechaLarga(dia.fecha)}</span> · {slot.hora} hs

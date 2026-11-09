@@ -10,6 +10,7 @@ import { CajaPage } from '@/features/caja/CajaPage';
 import { HorariosPage } from '@/features/horarios/HorariosPage';
 import { ReservasPage } from '@/features/reservas/ReservasPage';
 import { PanelLayout } from '@/layouts/PanelLayout';
+import { PinGate } from '@/layouts/PinGate';
 
 export default function App() {
   const tema = useStore((s) => s.tema);
@@ -20,7 +21,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/panel/horarios" replace />} />
-      <Route path="/panel" element={<PanelLayout />}>
+      <Route path="/panel" element={<PinGate><PanelLayout /></PinGate>}>
         <Route index element={<Navigate to="horarios" replace />} />
         <Route path="horarios" element={<HorariosPage />} />
         <Route path="agenda" element={<AgendaPage />} />

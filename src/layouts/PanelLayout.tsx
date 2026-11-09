@@ -1,6 +1,7 @@
-import { BarChart3, CalendarDays, Clock, Cog, MessageCircle, Moon, Receipt, Sun, Users } from 'lucide-react';
+import { BarChart3, CalendarDays, Clock, Cog, LogOut, MessageCircle, Moon, Receipt, Sun, Users } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAhora, useHoy, useStore } from '@/data/local/store';
+import { cerrarSesionPanel } from '@/layouts/PinGate';
 import { hoyReal } from '@/lib/horas';
 
 const NAV = [
@@ -58,6 +59,13 @@ export function PanelLayout() {
           >
             {tema === 'claro' ? <Moon size={16} /> : <Sun size={16} />} Tema {tema === 'claro' ? 'oscuro' : 'claro'}
           </button>
+          <a
+            href="/reservas"
+            onClick={cerrarSesionPanel}
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-mute hover:bg-sunken hover:text-ink"
+          >
+            <LogOut size={16} /> Salir del panel
+          </a>
         </div>
       </aside>
 

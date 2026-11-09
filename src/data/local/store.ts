@@ -39,7 +39,8 @@ interface Estado extends HorariosRepo {
   /** Solo demo: hora simulada "HH:mm" (null = hora real). */
   horaSimulada: string | null;
   tema: Tema;
-  local: { nombre: string; direccion: string };
+  /** `pin`: clave numérica para entrar al panel de administración. */
+  local: { nombre: string; direccion: string; pin: string };
   recordatorios: AjustesRecordatorios;
 
   setLocal(c: Partial<Estado['local']>): void;
@@ -107,7 +108,7 @@ export const useStore = create<Estado>()(
     (set, get) => ({
       ...estadoInicial(),
       tema: 'claro',
-      local: { nombre: 'Peluquería (ejemplo)', direccion: 'Dirección de ejemplo, Esperanza, Santa Fe' },
+      local: { nombre: 'Peluquería (ejemplo)', direccion: 'Dirección de ejemplo, Esperanza, Santa Fe', pin: '1234' },
 
       setLocal: (c) => set((s) => ({ local: { ...s.local, ...c } })),
       setRecordatorios: (c) => set((s) => ({ recordatorios: { ...s.recordatorios, ...c } })),
@@ -244,7 +245,15 @@ export const useStore = create<Estado>()(
       },
     }),
     // v2: agrega hora simulada, cajas cerradas y nuevo seed. Sin migración: arranca limpio.
-    { name: 'turnero-pelu-v1', version: 2 },
+    {
+      name: 'turnero-pelu-v1',
+      version: 2,
+      // `local` se mezcla campo a campo para que datos guardados sin `pin` tomen el valor por defecto.
+      merge: (persistido, actual) => {
+        const p = (persistido ?? {}) as Partial<Estado>;
+        return { ...actual, ...p, local: { ...actual.local, ...p.local } };
+      },
+    },
   ),
 );
 
