@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { WhatsAppBubble } from '@/components/WhatsAppBubble';
 import { useStore } from '@/data/local/store';
-import { PLANTILLA_DEFAULT, armarMensaje } from '@/domain/recordatorio';
+import { armarMensaje } from '@/domain/recordatorio';
 import { fechaLarga, formatARS } from '@/lib/format';
 import { CobroDialog } from '@/features/caja/CobroDialog';
 
@@ -17,7 +17,7 @@ const ESTADO: Record<string, string> = {
 
 /** Acciones sobre un turno: marcar llegó, cobrar, ausente, cancelar, reenviar recordatorio. */
 export function TurnoDialog({ turnoId, onCerrar }: { turnoId: string | null; onCerrar: () => void }) {
-  const { turnos, clientes, servicios, profesionales, local, setEstadoTurno, cobrarTurno } = useStore();
+  const { turnos, clientes, servicios, profesionales, local, recordatorios, setEstadoTurno, cobrarTurno } = useStore();
   const [cobrando, setCobrando] = useState(false);
   const [recordatorio, setRecordatorio] = useState<string | null>(null);
 
@@ -36,7 +36,7 @@ export function TurnoDialog({ turnoId, onCerrar }: { turnoId: string | null; onC
 
   const reenviar = () =>
     setRecordatorio(
-      armarMensaje(PLANTILLA_DEFAULT, {
+      armarMensaje(recordatorios.plantilla, {
         nombre: (cliente?.nombre ?? '').split(' ')[0], local: local.nombre, dia: fechaLarga(t.fecha),
         hora: t.hora, profesional: prof?.nombre ?? '',
       }),

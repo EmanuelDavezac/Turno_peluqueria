@@ -7,7 +7,7 @@ import { useAhora, useHoy, useStore } from '@/data/local/store';
 import { CUALQUIERA, slotsDisponibles, type Slot } from '@/domain/disponibilidad';
 import { getDia } from '@/domain/getDia';
 import { DIAS_NOMBRE, DIAS_ORDEN, formatFranjas, permiteFila, permiteTurnos } from '@/domain/modalidad';
-import { PLANTILLA_DEFAULT, armarMensaje } from '@/domain/recordatorio';
+import { armarMensaje } from '@/domain/recordatorio';
 import type { Turno } from '@/domain/types';
 import { PublicLayout } from '@/layouts/PublicLayout';
 import { fechaLarga, formatARS } from '@/lib/format';
@@ -33,7 +33,7 @@ function Paso({ n, titulo, children }: { n: number; titulo: string; children: Re
 }
 
 export function ReservasPage() {
-  const { semana, excepciones, servicios, profesionales, turnos, fila, local, reservar } = useStore();
+  const { semana, excepciones, servicios, profesionales, turnos, fila, local, recordatorios, reservar } = useStore();
   const hoy = useHoy();
   const ahora = useAhora();
 
@@ -119,7 +119,7 @@ export function ReservasPage() {
   // ---------- Confirmación ----------
   if (turno && servicio) {
     const prof = profesionales.find((p) => p.id === turno.profesionalId);
-    const mensaje = armarMensaje(PLANTILLA_DEFAULT, {
+    const mensaje = armarMensaje(recordatorios.plantilla, {
       nombre: nombre.trim().split(' ')[0], local: local.nombre, dia: fechaLarga(turno.fecha),
       hora: turno.hora, profesional: prof?.nombre ?? '',
     });

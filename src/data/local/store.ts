@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 import type { HorariosRepo } from '@/data/repositories';
 import { CLIENTES, PROFESIONALES, SEMANA_DEFAULT, SERVICIOS, generarSeed } from '@/data/seed';
 import { llamarSiguiente as elegirSiguiente, siguienteNumero } from '@/domain/fila';
+import { PLANTILLA_DEFAULT } from '@/domain/recordatorio';
 import type {
   Cliente, Cobro, EntradaFila, Excepcion, Profesional, Servicio, Turno,
 } from '@/domain/types';
@@ -11,6 +12,18 @@ import { ahoraISO, hoyReal, uid } from '@/lib/horas';
 
 export type Tema = 'claro' | 'oscuro';
 export type Medio = Cobro['medio'];
+
+export interface AjustesRecordatorios {
+  /** Avisar 24 h antes del turno. */
+  h24: boolean;
+  /** Avisar 2 h antes del turno. */
+  h2: boolean;
+  /** Avisar a quien está en la fila cuando le faltan 2 personas. */
+  fila: boolean;
+  plantilla: string;
+}
+
+const COLORES_EQUIPO = ['#2a6f6b', '#b0563a', '#6b4fa0', '#3f6fb5', '#a07a1f', '#7a3f5c'];
 
 interface Estado extends HorariosRepo {
   profesionales: Profesional[];
@@ -27,6 +40,17 @@ interface Estado extends HorariosRepo {
   horaSimulada: string | null;
   tema: Tema;
   local: { nombre: string; direccion: string };
+  recordatorios: AjustesRecordatorios;
+
+  setLocal(c: Partial<Estado['local']>): void;
+  setRecordatorios(c: Partial<AjustesRecordatorios>): void;
+  addCliente(d: { nombre: string; whatsapp: string; notas?: string }): Cliente;
+  updateCliente(id: string, c: Partial<Omit<Cliente, 'id'>>): void;
+  addProfesional(): Profesional;
+  updateProfesional(id: string, c: Partial<Omit<Profesional, 'id'>>): void;
+  addServicio(): Servicio;
+  updateServicio(id: string, c: Partial<Omit<Servicio, 'id'>>): void;
+  removeServicio(id: string): void;
 
   /** Reserva de turno: reutiliza al cliente si el WhatsApp ya existe. */
   reservar(d: {
@@ -64,6 +88,7 @@ function estadoInicial(hoy = hoyReal(), ahora = ahoraISO(hoy)) {
     profesionales: PROFESIONALES, servicios: SERVICIOS, clientes: CLIENTES,
     turnos: seed.turnos, fila: seed.fila, cobros: seed.cobros,
     cajasCerradas: [] as string[],
+    recordatorios: { h24: true, h2: true, fila: true, plantilla: PLANTILLA_DEFAULT } as AjustesRecordatorios,
     hoySimulado: null as string | null,
     horaSimulada: null as string | null,
   };
@@ -83,6 +108,36 @@ export const useStore = create<Estado>()(
       ...estadoInicial(),
       tema: 'claro',
       local: { nombre: 'Peluquería (ejemplo)', direccion: 'Dirección de ejemplo, Esperanza, Santa Fe' },
+
+      setLocal: (c) => set((s) => ({ local: { ...s.local, ...c } })),
+      setRecordatorios: (c) => set((s) => ({ recordatorios: { ...s.recordatorios, ...c } })),
+
+      addCliente: (d) => {
+        const c: Cliente = { id: uid('c'), nombre: d.nombre, whatsapp: d.whatsapp, notas: d.notas || undefined };
+        set((s) => ({ clientes: [...s.clientes, c] }));
+        return c;
+      },
+      updateCliente: (id, c) => set((s) => ({ clientes: s.clientes.map((x) => (x.id === id ? { ...x, ...c } : x)) })),
+
+      addProfesional: () => {
+        const s = get();
+        const p: Profesional = {
+          id: uid('p'), nombre: `Profesional ${s.profesionales.length + 1}`,
+          color: COLORES_EQUIPO[s.profesionales.length % COLORES_EQUIPO.length], comisionPct: 50, activo: true,
+        };
+        set({ profesionales: [...s.profesionales, p] });
+        return p;
+      },
+      updateProfesional: (id, c) =>
+        set((s) => ({ profesionales: s.profesionales.map((x) => (x.id === id ? { ...x, ...c } : x)) })),
+
+      addServicio: () => {
+        const sv: Servicio = { id: uid('s'), nombre: 'Nuevo servicio', duracionMin: 30, precio: 10000 };
+        set((s) => ({ servicios: [...s.servicios, sv] }));
+        return sv;
+      },
+      updateServicio: (id, c) => set((s) => ({ servicios: s.servicios.map((x) => (x.id === id ? { ...x, ...c } : x)) })),
+      removeServicio: (id) => set((s) => ({ servicios: s.servicios.filter((x) => x.id !== id) })),
 
       reservar: (d) => {
         const digitos = (w: string) => w.replace(/\D/g, '');

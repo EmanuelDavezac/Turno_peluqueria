@@ -20,4 +20,4 @@ npm test
 
 - `src/domain/`: lógica pura (`getDia`, modalidades, impacto de cambios).
 - `src/data/`: capa de datos intercambiable (localStorage hoy, Supabase en fase 2) y datos de ejemplo.
-- `src/features/`: pantallas (`horarios` listo; reservas, agenda y caja listos; clientes, reportes, recordatorios y configuración pendientes).
+- `src/features/`: pantallas (horarios, reservas, agenda, caja, clientes, reportes, recordatorios y configuración).
