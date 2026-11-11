@@ -80,3 +80,9 @@ describe('errores de la agenda', () => {
     expect(describirError({ code: 'TURNO_CAMBIO' })).toMatch(/cambió/i);
   });
 });
+
+describe('errores de clientes', () => {
+  it('WhatsApp repetido', () => {
+    expect(describirError({ code: 'WHATSAPP_REPETIDO' })).toMatch(/ya hay un cliente con ese whatsapp/i);
+  });
+});

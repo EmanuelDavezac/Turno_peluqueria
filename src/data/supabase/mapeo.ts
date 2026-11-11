@@ -1,5 +1,5 @@
 import type { Bloqueo } from '@/domain/disponibilidad';
-import type { Cliente, ConfigDia, DiaSemana, Excepcion, Franja, Modalidad, Profesional, Servicio, Turno } from '@/domain/types';
+import type { Cliente, Cobro, ConfigDia, DiaSemana, Excepcion, Franja, Modalidad, Profesional, Servicio, Turno } from '@/domain/types';
 
 /**
  * Filas tal como las devuelve la base → tipos del dominio.
@@ -75,3 +75,13 @@ export const aCliente = (f: FilaCliente): Cliente => ({ id: f.id, nombre: f.nomb
 
 /** Un turno con su cliente embebido (`select ..., clientes(...)`). */
 export interface FilaTurnoConCliente extends FilaTurno { duracion_min: number; clientes: FilaCliente | null }
+
+export interface FilaCobro {
+  id: string; fecha: string; hora: string; profesional_id: string; servicio_id: string;
+  cliente_nombre: string; monto: number; medio: Cobro['medio']; origen: string;
+}
+/** Todos los cobros salen de turnos (la fila ya no existe). `hora` llega como "10:30:00". */
+export const aCobro = (f: FilaCobro): Cobro => ({
+  id: f.id, fecha: f.fecha, hora: f.hora.slice(0, 5), profesionalId: f.profesional_id, servicioId: f.servicio_id,
+  clienteNombre: f.cliente_nombre, monto: f.monto, medio: f.medio, origen: 'turno',
+});

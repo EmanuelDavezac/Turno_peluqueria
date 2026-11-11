@@ -1,7 +1,9 @@
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMemo } from 'react';
-import { useHoy, useStore } from '@/data/local/store';
+import { Pantalla } from '@/components/EstadoCarga';
+import { useHoy } from '@/data/local/store';
+import { useReportes, type ReportesVista } from '@/data/useReportes';
 import { facturacionPorDia, porProfesional, serviciosMasPedidos } from '@/domain/reportes';
 import { formatARS } from '@/lib/format';
 import { sumarDias } from '@/lib/horas';
@@ -20,9 +22,26 @@ function Tarjeta({ titulo, valor, detalle, className = '' }: { titulo: string; v
 }
 
 export function ReportesPage() {
-  const { cobros, profesionales, servicios } = useStore();
   const hoy = useHoy();
   const desde = sumarDias(hoy, -(DIAS - 1));
+  const reportes = useReportes(desde, hoy);
+  return (
+    <div className="mx-auto max-w-5xl space-y-10">
+      <header>
+        <h1 className="text-3xl font-bold">Reportes</h1>
+        <p className="text-mute">
+          Últimos 7 días: {format(parseISO(desde), 'd MMM', { locale: es })} al {format(parseISO(hoy), 'd MMM', { locale: es })}
+        </p>
+      </header>
+      <Pantalla recurso={reportes} texto="Cargando los reportes…">
+        {(r) => <ReportesContenido r={r} hoy={hoy} desde={desde} />}
+      </Pantalla>
+    </div>
+  );
+}
+
+function ReportesContenido({ r, hoy, desde }: { r: ReportesVista; hoy: string; desde: string }) {
+  const { cobros, profesionales, servicios } = r;
 
   const porDia = useMemo(() => facturacionPorDia(cobros, hoy, DIAS), [cobros, hoy]);
   const profs = useMemo(() => porProfesional(cobros, profesionales, desde, hoy), [cobros, profesionales, desde, hoy]);
@@ -31,15 +50,9 @@ export function ReportesPage() {
   const total = porDia.reduce((a, d) => a + d.total, 0);
   const cantidad = profs.reduce((a, p) => a + p.cantidad, 0);
   const totalComision = profs.reduce((a, p) => a + p.comision, 0);
-  const rango = `${format(parseISO(desde), 'd MMM', { locale: es })} al ${format(parseISO(hoy), 'd MMM', { locale: es })}`;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-10">
-      <header>
-        <h1 className="text-3xl font-bold">Reportes</h1>
-        <p className="text-mute">Últimos 7 días: {rango}</p>
-      </header>
-
+    <div className="space-y-10">
       {cantidad === 0 ? (
         <p className="rounded-xl border border-dashed border-line p-8 text-center text-mute">No hay cobros en los últimos 7 días.</p>
       ) : (

@@ -1,9 +1,8 @@
-import { useEffect } from 'react';
 import { BACKEND } from '@/data/backend';
 import { useStore } from '@/data/local/store';
 import type { Medio } from '@/domain/caja';
 import type { Cliente, Profesional, Servicio, Turno } from '@/domain/types';
-import { listo, useCargar, type Cargable } from './recurso';
+import { listo, useCargar, useRefresco, type Cargable } from './recurso';
 
 export interface TurnoNuevo { hora: string; profesionalId: string; servicioId: string; nombre: string; whatsapp: string }
 
@@ -39,15 +38,7 @@ function useAgendaDiaSupabase(fecha: string): Cargable<AgendaVista> {
   const { estado, recargar } = useCargar(() => api().then((m) => m.leerAgenda(fecha)));
 
   // Los clientes reservan por su cuenta: la agenda se actualiza sola, sin tocar nada.
-  useEffect(() => {
-    const id = window.setInterval(recargar, REFRESCO_MS);
-    const alVolver = () => document.visibilityState === 'visible' && recargar();
-    document.addEventListener('visibilitychange', alVolver);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener('visibilitychange', alVolver);
-    };
-  }, [recargar]);
+  useRefresco(recargar, REFRESCO_MS);
 
   if (estado.estado === 'cargando') return estado;
   if (estado.estado === 'error') return { estado: 'error', mensaje: estado.mensaje, reintentar: recargar };

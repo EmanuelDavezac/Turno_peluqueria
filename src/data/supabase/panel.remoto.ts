@@ -10,6 +10,8 @@ import * as catalogo from './catalogo';
 import { supabase } from './client';
 import * as horarios from './horarios';
 import * as agenda from './agenda';
+import * as caja from './caja';
+import * as clientes from './clientes';
 import * as publico from './publico';
 import { describirErrorReserva } from '../errores';
 import { getDia } from '@/domain/getDia';
@@ -26,6 +28,7 @@ const mas = (n: number) => {
   return d.toISOString().slice(0, 10);
 };
 const FECHA_TURNOS = mas(3);
+const OFF_AGENDA = 8 + Math.floor(Math.random() * 20);
 const WSP = '3490000999'; // número de prueba
 
 const creado = {
@@ -180,7 +183,7 @@ describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
   });
 
   it('AGENDA del panel: ve lo que reservó el cliente, marca llegó, carga a mano, cobra y cancela', async () => {
-    const fecha = mas(4);
+    const fecha = mas(OFF_AGENDA);
     const ex = await horarios.crearExcepcion({ fecha, modalidad: 'turnos', franjas: [{ desde: '09:00', hasta: '13:00' }], motivo: `${P} agenda` });
     creado.excepcionIds.push(ex.id);
 
@@ -227,6 +230,53 @@ describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
     expect(ag.turnos.find((x) => x.id === manual.id)?.estado).toBe('cancelado');
     const e3 = await agenda.cambiarEstado(manual.id, 'cancelado').then(() => null, (x) => x);
     expect(codigoDe(e3)).toBe('TURNO_CAMBIO');
+  });
+
+  it('CAJA, CLIENTES y REPORTES: ven lo cobrado en la agenda', async () => {
+    const fecha = mas(OFF_AGENDA); // el día del test anterior: tiene un turno atendido y cobrado ($1)
+
+    // Caja del día: el cobro está, con servicio y profesional
+    const c = await caja.leerCaja(fecha);
+    const cobro = c.cobros.find((x) => x.clienteNombre === `${P} Agenda`);
+    expect(cobro).toMatchObject({ fecha, monto: 1, medio: 'efectivo', origen: 'turno' });
+    expect(cobro!.hora).toMatch(/^\d{2}:\d{2}$/);
+    expect(c.servicios.some((s) => s.id === cobro!.servicioId)).toBe(true);
+    expect(c.profesionales.some((p) => p.id === cobro!.profesionalId)).toBe(true);
+    expect(c.cerrada).toBe(false);
+
+    // Reportes: el rango incluye ese cobro
+    const r = await caja.leerCobros(mas(OFF_AGENDA - 1), mas(OFF_AGENDA + 1));
+    expect(r.cobros.some((x) => x.id === cobro!.id)).toBe(true);
+    expect((await caja.leerCobros(mas(OFF_AGENDA + 2), mas(OFF_AGENDA + 3))).cobros.some((x) => x.id === cobro!.id)).toBe(false);
+
+    // Cerrar la caja de un día de prueba (sin cobros) es idempotente
+    const dia = '2000-01-01'; // fecha de prueba fija: la caja queda cerrada y se borra con el SQL de limpieza
+    await caja.cerrarCaja(dia);
+    await caja.cerrarCaja(dia); // ya cerrada: no es error
+    expect((await caja.leerCaja(dia)).cerrada).toBe(true);
+
+    // Clientes: el de la agenda figura con visitas (turnos atendidos) y su historial
+    const cl = await clientes.leerClientes();
+    const ana = cl.clientes.find((x) => x.nombre === `${P} Agenda`)!;
+    expect(ana).toBeTruthy();
+    // (el cliente de prueba acumula visitas de corridas anteriores: alcanza con que esta esté)
+    expect(cl.resumen[ana.id].visitas).toBeGreaterThanOrEqual(1);
+    expect(cl.resumen[ana.id].ultimaVisita! >= fecha).toBe(true);
+    const hist = await clientes.leerHistorial(ana.id);
+    expect(hist.length).toBeGreaterThanOrEqual(1);
+    expect(hist.length).toBeLessThanOrEqual(5);
+    expect(hist.some((h) => h.fecha === fecha && h.estado === 'atendido')).toBe(true);
+
+    // Alta y edición de clientes; el WhatsApp repetido se rechaza con mensaje claro
+    await clientes.crearCliente({ nombre: `${P} Alta`, whatsapp: '3490000991', notas: 'nota de prueba' });
+    const alta = (await clientes.leerClientes()).clientes.find((x) => x.nombre === `${P} Alta`)!;
+    expect(alta).toMatchObject({ whatsapp: '3490000991', notas: 'nota de prueba' });
+    await clientes.guardarCliente(alta.id, { nombre: `${P} Alta editada`, whatsapp: '3490000991' });
+    const ed = (await clientes.leerClientes()).clientes.find((x) => x.id === alta.id)!;
+    expect(ed.nombre).toBe(`${P} Alta editada`);
+    expect(ed.notas).toBeUndefined();
+    const dup = await clientes.crearCliente({ nombre: `${P} Duplicado`, whatsapp: '3490000991' }).then(() => null, (x) => x);
+    expect(describirError(dup)).toMatch(/ya hay un cliente con ese whatsapp/i);
   });
 
   it('sin conexión: el error se reconoce como de red y el mensaje es claro', async () => {

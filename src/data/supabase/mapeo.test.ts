@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aCliente, aBloqueosPorFecha, aProfesionalPublico, aExcepcion, aProfesional, aSemana, aServicio, aTurno, deProfesional, deServicio } from './mapeo';
+import { aCobro, aCliente, aBloqueosPorFecha, aProfesionalPublico, aExcepcion, aProfesional, aSemana, aServicio, aTurno, deProfesional, deServicio } from './mapeo';
 
 describe('mapeo base → dominio', () => {
   it('semana: franjas null pasa a []', () => {
@@ -80,5 +80,18 @@ describe('mapeo de la agenda', () => {
   });
   it('cliente: notas null pasa a undefined', () => {
     expect(aCliente({ id: 'c', nombre: 'Ana', whatsapp: '3496 1', notas: null })).toEqual({ id: 'c', nombre: 'Ana', whatsapp: '3496 1', notas: undefined });
+  });
+});
+
+describe('mapeo de cobros', () => {
+  it('la hora pierde los segundos y todo cobro sale de un turno', () => {
+    const c = aCobro({
+      id: 'c', fecha: '2026-11-11', hora: '17:05:00', profesional_id: 'p', servicio_id: 's',
+      cliente_nombre: 'Ana', monto: 11000, medio: 'mercadopago', origen: 'turno',
+    });
+    expect(c).toEqual({
+      id: 'c', fecha: '2026-11-11', hora: '17:05', profesionalId: 'p', servicioId: 's',
+      clienteNombre: 'Ana', monto: 11000, medio: 'mercadopago', origen: 'turno',
+    });
   });
 });

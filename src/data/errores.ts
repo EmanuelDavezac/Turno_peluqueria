@@ -35,6 +35,7 @@ export function describirError(e: unknown): string {
   if (x.code === '23505') return 'Ya existe un registro igual.';
   if (x.code === '23P01') return 'Ese horario ya está ocupado por otro turno.';
   if (x.code === 'P0001' && msg === 'turno_no_cobrable') return 'Ese turno ya no se puede cobrar (ya está cobrado o cancelado).';
+  if (x.code === 'WHATSAPP_REPETIDO') return 'Ya hay un cliente con ese WhatsApp.';
   if (x.code === 'TURNO_CAMBIO') return 'Ese turno ya cambió de estado. Se actualizó la agenda: revisá y volvé a intentar.';
   return 'Algo salió mal en el servidor. Volvé a intentar en unos minutos.';
 }

@@ -1,34 +1,65 @@
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Plus, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
-import { useStore } from '@/data/local/store';
-import { buscarClientes, fichaCliente } from '@/domain/clientes';
-import type { Cliente } from '@/domain/types';
+import { AvisoError, Pantalla } from '@/components/EstadoCarga';
+import { BACKEND } from '@/data/backend';
+import { describirError } from '@/data/errores';
+import { useClientes, type ClientesVista } from '@/data/useClientes';
+import { buscarClientes } from '@/domain/clientes';
+import type { Cliente, Turno } from '@/domain/types';
 import { fechaLarga } from '@/lib/format';
 
 const field = 'mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-base';
 const fechaCorta = (iso?: string) => (iso ? format(parseISO(iso), 'd MMM yyyy', { locale: es }) : '—');
 
+/** Topes de la base (en la demo local no hay tope). */
+const MAX = BACKEND === 'supabase' ? { nombre: 80, whatsapp: 30, notas: 500 } : { nombre: undefined, whatsapp: undefined, notas: undefined };
+
 /** Alta y edición de un cliente. `cliente` null = alta nueva. */
-function FichaDialog({ cliente, abierto, onCerrar }: { cliente: Cliente | null; abierto: boolean; onCerrar: () => void }) {
-  const { turnos, servicios, profesionales, addCliente, updateCliente } = useStore();
+function FichaDialog({ cliente, abierto, v, onCerrar }: { cliente: Cliente | null; abierto: boolean; v: ClientesVista; onCerrar: () => void }) {
+  const { servicios, profesionales, addCliente, updateCliente } = v;
+  // `v` se rearma en cada render: se guarda en una ref para no volver a pedir las visitas cada vez.
+  const leerHistorial = useRef(v.historial);
+  leerHistorial.current = v.historial;
   const [nombre, setNombre] = useState(cliente?.nombre ?? '');
   const [whatsapp, setWhatsapp] = useState(cliente?.whatsapp ?? '');
   const [notas, setNotas] = useState(cliente?.notas ?? '');
   const [error, setError] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const [historial, setHistorial] = useState<Turno[] | 'cargando' | 'error'>(cliente ? 'cargando' : []);
 
-  const historial = cliente
-    ? turnos.filter((t) => t.clienteId === cliente.id && t.estado === 'atendido').sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5)
-    : [];
+  useEffect(() => {
+    if (!cliente || !abierto) return;
+    let vivo = true;
+    setHistorial('cargando');
+    leerHistorial.current(cliente.id).then(
+      (h) => vivo && setHistorial(h),
+      () => vivo && setHistorial('error'),
+    );
+    return () => {
+      vivo = false;
+    };
+  }, [cliente?.id, abierto]);
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!nombre.trim()) return setError('El nombre es obligatorio.');
-    if (cliente) updateCliente(cliente.id, { nombre: nombre.trim(), whatsapp: whatsapp.trim(), notas: notas.trim() || undefined });
-    else addCliente({ nombre: nombre.trim(), whatsapp: whatsapp.trim(), notas: notas.trim() });
-    onCerrar();
+    if (guardando) return;
+    setError('');
+    setGuardando(true);
+    try {
+      const datos = { nombre: nombre.trim(), whatsapp: whatsapp.trim(), notas: notas.trim() || undefined };
+      if (cliente) await updateCliente(cliente.id, datos);
+      else await addCliente(datos);
+      onCerrar();
+    } catch (e) {
+      // El diálogo sigue abierto con lo escrito: se explica qué pasó y se puede reintentar.
+      setError(describirError(e));
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -36,22 +67,26 @@ function FichaDialog({ cliente, abierto, onCerrar }: { cliente: Cliente | null; 
       <div className="space-y-3">
         <label className="block text-sm font-medium">
           Nombre
-          <input className={field} value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          <input className={field} value={nombre} maxLength={MAX.nombre} onChange={(e) => setNombre(e.target.value)} />
         </label>
         <label className="block text-sm font-medium">
           WhatsApp
-          <input className={field} value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} inputMode="tel" placeholder="3496 ..." />
+          <input className={field} value={whatsapp} maxLength={MAX.whatsapp} onChange={(e) => setWhatsapp(e.target.value)} inputMode="tel" placeholder="3496 ..." />
         </label>
         <label className="block text-sm font-medium">
           Notas
-          <textarea className={field} rows={3} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Ej: máquina 2 a los costados" />
+          <textarea className={field} rows={3} value={notas} maxLength={MAX.notas} onChange={(e) => setNotas(e.target.value)} placeholder="Ej: máquina 2 a los costados" />
         </label>
-        {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
+        {error && <AvisoError mensaje={error} onCerrar={() => setError('')} />}
 
         {cliente && (
           <div>
             <p className="mb-1 text-sm font-semibold">Últimas visitas</p>
-            {historial.length ? (
+            {historial === 'cargando' ? (
+              <p className="text-sm text-mute" role="status">Cargando…</p>
+            ) : historial === 'error' ? (
+              <p className="text-sm text-red-600">No se pudieron cargar las visitas. Cerrá y volvé a abrir la ficha para reintentar.</p>
+            ) : historial.length ? (
               <ul className="divide-y divide-line rounded-xl border border-line text-sm">
                 {historial.map((t) => (
                   <li key={t.id} className="flex justify-between gap-3 px-3 py-2">
@@ -72,8 +107,8 @@ function FichaDialog({ cliente, abierto, onCerrar }: { cliente: Cliente | null; 
         <Button variante="ghost" className="flex-1" onClick={onCerrar}>
           Cancelar
         </Button>
-        <Button className="flex-1" onClick={guardar}>
-          Guardar
+        <Button className="flex-1" disabled={guardando} onClick={() => void guardar()}>
+          {guardando ? 'Guardando…' : 'Guardar'}
         </Button>
       </div>
     </Dialog>
@@ -81,17 +116,22 @@ function FichaDialog({ cliente, abierto, onCerrar }: { cliente: Cliente | null; 
 }
 
 export function ClientesPage() {
-  const { clientes, turnos } = useStore();
+  const clientes = useClientes();
+  return (
+    <Pantalla recurso={clientes} texto="Cargando los clientes…">
+      {(v) => <ClientesContenido v={v} />}
+    </Pantalla>
+  );
+}
+
+function ClientesContenido({ v }: { v: ClientesVista }) {
+  const { clientes, resumen } = v;
   const [consulta, setConsulta] = useState('');
   const [sel, setSel] = useState<Cliente | null | undefined>(undefined); // undefined = cerrado, null = nuevo
 
-  const fichas = useMemo(
-    () =>
-      buscarClientes(clientes, consulta)
-        .map((c) => fichaCliente(c, turnos))
-        .sort((a, b) => a.cliente.nombre.localeCompare(b.cliente.nombre, 'es')),
-    [clientes, turnos, consulta],
-  );
+  const fichas = buscarClientes(clientes, consulta)
+    .map((c) => ({ cliente: c, ...resumen(c.id) }))
+    .sort((a, b) => a.cliente.nombre.localeCompare(b.cliente.nombre, 'es'));
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -144,7 +184,7 @@ export function ClientesPage() {
       )}
 
       {/* key: reinicia los campos al cambiar de cliente */}
-      <FichaDialog key={sel?.id ?? 'nuevo'} cliente={sel ?? null} abierto={sel !== undefined} onCerrar={() => setSel(undefined)} />
+      <FichaDialog key={sel?.id ?? 'nuevo'} cliente={sel ?? null} abierto={sel !== undefined} v={v} onCerrar={() => setSel(undefined)} />
     </div>
   );
 }

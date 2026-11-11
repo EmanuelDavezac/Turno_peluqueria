@@ -44,3 +44,16 @@ export function useCargar<T>(cargar: () => Promise<T>) {
 
 /** Un recurso que nunca espera (modo local): siempre "listo". */
 export const listo = <T,>(datos: T): Cargable<T> => ({ estado: 'listo', datos });
+
+/** Vuelve a pedir los datos cada `ms` y cuando se vuelve a la pestaña (otros dispositivos pueden haber cambiado cosas). */
+export function useRefresco(recargar: () => void, ms = 30_000): void {
+  useEffect(() => {
+    const id = window.setInterval(recargar, ms);
+    const alVolver = () => document.visibilityState === 'visible' && recargar();
+    document.addEventListener('visibilitychange', alVolver);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', alVolver);
+    };
+  }, [recargar, ms]);
+}

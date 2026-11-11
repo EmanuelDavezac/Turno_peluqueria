@@ -2,20 +2,17 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { NavFecha } from '@/components/NavFecha';
-import { useHoy, useStore } from '@/data/local/store';
+import { AvisoError, Pantalla } from '@/components/EstadoCarga';
+import { describirError } from '@/data/errores';
+import { useHoy } from '@/data/local/store';
+import { useCaja, type CajaVista } from '@/data/useCaja';
 import { MEDIOS, MEDIO_LABEL, totalesCaja } from '@/domain/caja';
 import { fechaLarga, formatARS } from '@/lib/format';
 
 export function CajaPage() {
-  const { cobros, servicios, profesionales, cajasCerradas, cerrarCaja } = useStore();
   const hoy = useHoy();
   const [fecha, setFecha] = useState(hoy);
-  const [cerrando, setCerrando] = useState(false);
   useEffect(() => setFecha(hoy), [hoy]);
-
-  const del = cobros.filter((c) => c.fecha === fecha).sort((a, b) => a.hora.localeCompare(b.hora));
-  const t = totalesCaja(cobros, fecha);
-  const cerrada = cajasCerradas.includes(fecha);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -23,7 +20,47 @@ export function CajaPage() {
         <h1 className="text-3xl font-bold">Caja</h1>
         <NavFecha fecha={fecha} hoy={hoy} onChange={setFecha} />
       </header>
+      {/* key: cada día se carga aparte, con su propio estado de carga y error */}
+      <CajaDia key={fecha} fecha={fecha} />
+    </div>
+  );
+}
 
+function CajaDia({ fecha }: { fecha: string }) {
+  const caja = useCaja(fecha);
+  return (
+    <Pantalla recurso={caja} texto="Cargando la caja…">
+      {(c) => <CajaContenido fecha={fecha} c={c} />}
+    </Pantalla>
+  );
+}
+
+function CajaContenido({ fecha, c }: { fecha: string; c: CajaVista }) {
+  const { cobros, servicios, profesionales, cerrada } = c;
+  const [cerrando, setCerrando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState('');
+
+  const del = cobros.filter((x) => x.fecha === fecha).sort((a, b) => a.hora.localeCompare(b.hora));
+  const t = totalesCaja(cobros, fecha);
+
+  const confirmarCierre = async () => {
+    if (guardando) return;
+    setError('');
+    setGuardando(true);
+    try {
+      await c.cerrarCaja();
+      setCerrando(false);
+    } catch (e) {
+      // El diálogo sigue abierto: se explica qué pasó y se puede reintentar.
+      setError(describirError(e));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {MEDIOS.map((m) => (
           <div key={m} className="rounded-xl border border-line bg-surface p-3">
@@ -81,6 +118,11 @@ export function CajaPage() {
 
       <Dialog open={cerrando} onClose={() => setCerrando(false)} title="Cerrar caja">
         <p className="mb-3 text-sm text-mute first-letter:uppercase">{fechaLarga(fecha)} · {t.cantidad} cobros</p>
+        {error && (
+          <div className="mb-3">
+            <AvisoError mensaje={error} onCerrar={() => setError('')} />
+          </div>
+        )}
         <ul className="divide-y divide-line rounded-xl border border-line text-sm">
           {MEDIOS.map((m) => (
             <li key={m} className="flex justify-between px-3 py-2">
@@ -97,14 +139,8 @@ export function CajaPage() {
           <Button variante="ghost" className="flex-1" onClick={() => setCerrando(false)}>
             Volver
           </Button>
-          <Button
-            className="flex-1"
-            onClick={() => {
-              cerrarCaja(fecha);
-              setCerrando(false);
-            }}
-          >
-            Confirmar cierre
+          <Button className="flex-1" disabled={guardando} onClick={() => void confirmarCierre()}>
+            {guardando ? 'Cerrando…' : 'Confirmar cierre'}
           </Button>
         </div>
       </Dialog>
