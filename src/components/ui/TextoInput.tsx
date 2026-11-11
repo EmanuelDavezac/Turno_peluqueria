@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 
 /** Texto obligatorio: confirma mientras escribís solo si no está vacío; al salir, un campo vacío vuelve al valor anterior. */
-export function TextoInput({ value, onCommit, label, className = '' }: {
+export function TextoInput({ value, onCommit, label, maxLength, className = '' }: {
   value: string;
   onCommit: (v: string) => void;
   label: string;
+  maxLength?: number;
   className?: string;
 }) {
   const [texto, setTexto] = useState(value);
@@ -18,6 +19,7 @@ export function TextoInput({ value, onCommit, label, className = '' }: {
         value={texto}
         aria-invalid={vacio}
         aria-label={label}
+        maxLength={maxLength}
         onChange={(e) => {
           setTexto(e.target.value);
           if (e.target.value.trim()) onCommit(e.target.value);
