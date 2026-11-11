@@ -6,7 +6,7 @@
 -- como la encontró.
 create extension if not exists dblink with schema extensions;
 
-select plan(8);
+select plan(5);
 
 create temp table resultados (prueba text, conn text, ok boolean, mensaje text);
 
@@ -27,7 +27,6 @@ end $$;
 -- Si una corrida anterior murió a la mitad, estos deletes dejan todo limpio
 -- (si no alcanza: `npx supabase db reset`).
 delete from turnos   where servicio_id = '00000000-0000-0000-0000-00000000c0b1';
-delete from fila     where servicio_id = '00000000-0000-0000-0000-00000000c0b1';
 delete from clientes where nombre like 'Conc %' or nombre like 'Distinto %';
 delete from servicios     where id = '00000000-0000-0000-0000-00000000c0b1';
 delete from profesionales where id = '00000000-0000-0000-0000-00000000c0a1';
@@ -37,29 +36,6 @@ insert into servicios (id, nombre, duracion_min, precio) values ('00000000-0000-
 create temp table semana_original as select * from semana;
 update semana set modalidad = 'turnos', franjas = '[{"desde":"09:00","hasta":"13:00"}]'
  where dia = extract(dow from hoy_ar() + 3)::int;
-
--- ---------- 1. Número de fila: 10 altas simultáneas ----------
-do $$
-declare i integer; v_num integer;
-begin
-  for i in 1..10 loop
-    perform extensions.dblink_send_query('c' || i,
-      $q$select (anotar_fila_interno('00000000-0000-0000-0000-00000000c0b1', 'Conc', null, null, 'local')).numero$q$);
-  end loop;
-  for i in 1..10 loop
-    begin
-      select t.n into v_num from extensions.dblink_get_result('c' || i) as t(n integer);
-      insert into resultados values ('fila', 'c' || i, true, v_num::text);
-    exception when others then
-      insert into resultados values ('fila', 'c' || i, false, sqlerrm);
-    end;
-    perform extensions.dblink_get_result('c' || i); -- vacía la conexión para la próxima prueba
-  end loop;
-end $$;
-
-select is((select count(*)::int from resultados where prueba = 'fila' and ok), 10, 'fila: las 10 altas simultáneas tuvieron éxito');
-select is((select count(distinct mensaje)::int from resultados where prueba = 'fila' and ok), 10, 'fila: 10 números distintos (sin repetidos)');
-select is((select max(mensaje::int) - min(mensaje::int) from resultados where prueba = 'fila' and ok), 9, 'fila: números correlativos, sin huecos');
 
 -- ---------- 2. Turnos: 6 reservas simultáneas del mismo horario ----------
 do $$
@@ -116,7 +92,6 @@ end $$;
 
 delete from cobros   where servicio_id = '00000000-0000-0000-0000-00000000c0b1';
 delete from turnos   where servicio_id = '00000000-0000-0000-0000-00000000c0b1';
-delete from fila     where servicio_id = '00000000-0000-0000-0000-00000000c0b1';
 delete from clientes where nombre like 'Conc %' or nombre like 'Distinto %';
 update semana s set modalidad = o.modalidad, franjas = o.franjas from semana_original o where s.dia = o.dia;
 delete from servicios      where id = '00000000-0000-0000-0000-00000000c0b1';
