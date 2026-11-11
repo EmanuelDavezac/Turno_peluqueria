@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useAhora, useStore } from '@/data/local/store';
+import { useAhora } from '@/data/local/store';
+import type { AgendaVista } from '@/data/useAgendaDia';
 import { PASO_MIN, bloqueosDelDia, hayChoque } from '@/domain/disponibilidad';
 import type { DiaResuelto, Turno } from '@/domain/types';
 import { fromMin, toMin } from '@/lib/horas';
@@ -15,8 +16,8 @@ const RAYADO = {
 };
 
 /** Grilla de turnos: una columna por profesional, franjas cerradas rayadas y línea de "ahora". */
-export function GrillaTurnos({ dia, hoy }: { dia: DiaResuelto; hoy: string }) {
-  const { profesionales, turnos, servicios, clientes } = useStore();
+export function GrillaTurnos({ dia, hoy, agenda }: { dia: DiaResuelto; hoy: string; agenda: AgendaVista }) {
+  const { profesionales, turnos, servicios, clientes } = agenda;
   const ahora = useAhora();
   const [nuevo, setNuevo] = useState<{ hora: string; profesionalId: string } | null>(null);
   const [turnoSel, setTurnoSel] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function GrillaTurnos({ dia, hoy }: { dia: DiaResuelto; hoy: string }) {
   const marcas: number[] = [];
   for (let m = Math.ceil(inicio / 30) * 30; m <= fin; m += 30) marcas.push(m);
 
-  const duracion = (t: Turno) => servicios.find((s) => s.id === t.servicioId)?.duracionMin ?? PASO_MIN;
+  const duracion = (t: Turno) => t.duracionMin ?? servicios.find((s) => s.id === t.servicioId)?.duracionMin ?? PASO_MIN;
   const nombreCliente = (t: Turno) => clientes.find((c) => c.id === t.clienteId)?.nombre ?? 'Cliente';
 
   return (
@@ -132,8 +133,8 @@ export function GrillaTurnos({ dia, hoy }: { dia: DiaResuelto; hoy: string }) {
         </div>
       </div>
 
-      <NuevoTurnoDialog dia={dia} hueco={nuevo} onCerrar={() => setNuevo(null)} />
-      <TurnoDialog turnoId={turnoSel} onCerrar={() => setTurnoSel(null)} />
+      <NuevoTurnoDialog dia={dia} hueco={nuevo} agenda={agenda} onCerrar={() => setNuevo(null)} />
+      <TurnoDialog turnoId={turnoSel} agenda={agenda} onCerrar={() => setTurnoSel(null)} />
     </>
   );
 }

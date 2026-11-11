@@ -1,5 +1,5 @@
 import type { Bloqueo } from '@/domain/disponibilidad';
-import type { ConfigDia, DiaSemana, Excepcion, Franja, Modalidad, Profesional, Servicio, Turno } from '@/domain/types';
+import type { Cliente, ConfigDia, DiaSemana, Excepcion, Franja, Modalidad, Profesional, Servicio, Turno } from '@/domain/types';
 
 /**
  * Filas tal como las devuelve la base → tipos del dominio.
@@ -13,6 +13,7 @@ export interface FilaServicio { id: string; nombre: string; duracion_min: number
 export interface FilaTurno {
   id: string; fecha: string; hora: string; profesional_id: string; servicio_id: string; cliente_id: string;
   estado: Turno['estado']; origen: Turno['origen'];
+  duracion_min?: number;
 }
 
 export const aSemana = (f: FilaSemana): ConfigDia => ({ dia: f.dia as DiaSemana, modalidad: f.modalidad, franjas: f.franjas ?? [] });
@@ -34,6 +35,7 @@ export const aServicio = (f: FilaServicio): Servicio => ({
 export const aTurno = (f: FilaTurno): Turno => ({
   id: f.id, fecha: f.fecha, hora: f.hora.slice(0, 5), profesionalId: f.profesional_id, servicioId: f.servicio_id,
   clienteId: f.cliente_id, estado: f.estado, origen: f.origen,
+  ...(f.duracion_min !== undefined && { duracionMin: f.duracion_min }),
 });
 
 /** Cambios del dominio → columnas de la base (solo las que vienen definidas). */
@@ -67,3 +69,9 @@ export function aBloqueosPorFecha(filas: FilaOcupado[]): Record<string, Bloqueo[
   for (const f of filas) (out[f.fecha] ??= []).push({ profesionalId: f.profesional_id, ini: f.ini, fin: f.fin });
   return out;
 }
+
+export interface FilaCliente { id: string; nombre: string; whatsapp: string; notas: string | null }
+export const aCliente = (f: FilaCliente): Cliente => ({ id: f.id, nombre: f.nombre, whatsapp: f.whatsapp, notas: f.notas ?? undefined });
+
+/** Un turno con su cliente embebido (`select ..., clientes(...)`). */
+export interface FilaTurnoConCliente extends FilaTurno { duracion_min: number; clientes: FilaCliente | null }

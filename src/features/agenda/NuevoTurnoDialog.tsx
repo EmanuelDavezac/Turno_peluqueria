@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
-import { useStore } from '@/data/local/store';
+import { AvisoError } from '@/components/EstadoCarga';
+import { describirError } from '@/data/errores';
+import type { AgendaVista } from '@/data/useAgendaDia';
 import { puedeTomar } from '@/domain/disponibilidad';
 import type { DiaResuelto } from '@/domain/types';
 import { fechaLarga, formatARS } from '@/lib/format';
@@ -9,16 +11,18 @@ import { fechaLarga, formatARS } from '@/lib/format';
 const input = 'mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-base';
 
 /** Click en un hueco libre de la grilla → cargar un turno a mano (origen "local"). */
-export function NuevoTurnoDialog({ dia, hueco, onCerrar }: {
+export function NuevoTurnoDialog({ dia, hueco, agenda, onCerrar }: {
   dia: DiaResuelto;
+  agenda: AgendaVista;
   hueco: { hora: string; profesionalId: string } | null;
   onCerrar: () => void;
 }) {
-  const { servicios, profesionales, turnos, reservar } = useStore();
+  const { servicios, profesionales, turnos, crearTurno } = agenda;
   const [servicioId, setServicioId] = useState(servicios[0]?.id ?? '');
   const [nombre, setNombre] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [error, setError] = useState('');
+  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     if (hueco) {
@@ -34,14 +38,23 @@ export function NuevoTurnoDialog({ dia, hueco, onCerrar }: {
   const prof = profesionales.find((p) => p.id === hueco.profesionalId);
   const entra = !!servicio && puedeTomar({ dia, servicio, servicios, turnos, profesionalId: hueco.profesionalId, hora: hueco.hora });
 
-  const guardar = () => {
-    if (!servicio || !entra) return;
+  const guardar = async () => {
+    if (!servicio || !entra || guardando) return;
     if (!nombre.trim()) return setError('Escribí el nombre del cliente.');
-    reservar({
-      fecha: dia.fecha, hora: hueco.hora, profesionalId: hueco.profesionalId, servicioId: servicio.id,
-      nombre: nombre.trim(), whatsapp: whatsapp.trim(), origen: 'local',
-    });
-    onCerrar();
+    setError('');
+    setGuardando(true);
+    try {
+      await crearTurno({
+        hora: hueco.hora, profesionalId: hueco.profesionalId, servicioId: servicio.id,
+        nombre: nombre.trim(), whatsapp: whatsapp.trim(),
+      });
+      onCerrar();
+    } catch (e) {
+      // Si no se pudo (sin conexión, horario ya tomado), el diálogo sigue abierto con lo escrito.
+      setError(describirError(e));
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -73,14 +86,14 @@ export function NuevoTurnoDialog({ dia, hueco, onCerrar }: {
             Este servicio dura {servicio.duracionMin} min y no entra en este hueco (se pisa con otro turno o termina fuera del horario).
           </p>
         )}
-        {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
+        {error && <AvisoError mensaje={error} onCerrar={() => setError('')} />}
       </div>
       <div className="mt-5 flex gap-2">
         <Button variante="ghost" className="flex-1" onClick={onCerrar}>
           Cancelar
         </Button>
-        <Button className="flex-1" disabled={!entra} onClick={guardar}>
-          Guardar turno
+        <Button className="flex-1" disabled={!entra || guardando} onClick={() => void guardar()}>
+          {guardando ? 'Guardando…' : 'Guardar turno'}
         </Button>
       </div>
     </Dialog>

@@ -68,3 +68,15 @@ describe('describirErrorReserva', () => {
     expect(describirErrorReserva(new TypeError('Failed to fetch')).texto).toMatch(/conexión/i);
   });
 });
+
+describe('errores de la agenda', () => {
+  it('horario pisado por otro turno (exclusión)', () => {
+    expect(describirError({ code: '23P01' })).toMatch(/ocupado/i);
+  });
+  it('turno que ya no se puede cobrar', () => {
+    expect(describirError({ code: 'P0001', message: 'turno_no_cobrable' })).toMatch(/ya no se puede cobrar/i);
+  });
+  it('turno que cambió de estado mientras se miraba', () => {
+    expect(describirError({ code: 'TURNO_CAMBIO' })).toMatch(/cambió/i);
+  });
+});

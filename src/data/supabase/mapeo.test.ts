@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aBloqueosPorFecha, aProfesionalPublico, aExcepcion, aProfesional, aSemana, aServicio, aTurno, deProfesional, deServicio } from './mapeo';
+import { aCliente, aBloqueosPorFecha, aProfesionalPublico, aExcepcion, aProfesional, aSemana, aServicio, aTurno, deProfesional, deServicio } from './mapeo';
 
 describe('mapeo base → dominio', () => {
   it('semana: franjas null pasa a []', () => {
@@ -60,5 +60,25 @@ describe('mapeo público', () => {
   });
   it('profesional público: sin comisión (es privada)', () => {
     expect(aProfesionalPublico({ id: 'p', nombre: 'Ana', activo: true })).toMatchObject({ id: 'p', nombre: 'Ana', comisionPct: 0, activo: true });
+  });
+});
+
+describe('mapeo de la agenda', () => {
+  it('turno: conserva la duración con la que se tomó', () => {
+    const t = aTurno({
+      id: 't', fecha: '2026-11-20', hora: '10:30:00', profesional_id: 'p', servicio_id: 's', cliente_id: 'c',
+      estado: 'llego', origen: 'local', duracion_min: 45,
+    });
+    expect(t).toMatchObject({ hora: '10:30', estado: 'llego', origen: 'local', duracionMin: 45 });
+  });
+  it('turno sin duración (otras lecturas) no inventa una', () => {
+    const t = aTurno({
+      id: 't', fecha: '2026-11-20', hora: '10:30:00', profesional_id: 'p', servicio_id: 's', cliente_id: 'c',
+      estado: 'reservado', origen: 'online',
+    });
+    expect('duracionMin' in t).toBe(false);
+  });
+  it('cliente: notas null pasa a undefined', () => {
+    expect(aCliente({ id: 'c', nombre: 'Ana', whatsapp: '3496 1', notas: null })).toEqual({ id: 'c', nombre: 'Ana', whatsapp: '3496 1', notas: undefined });
   });
 });

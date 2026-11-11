@@ -9,6 +9,7 @@ import { codigoDe, describirError, esErrorDeRed } from '../errores';
 import * as catalogo from './catalogo';
 import { supabase } from './client';
 import * as horarios from './horarios';
+import * as agenda from './agenda';
 import * as publico from './publico';
 import { describirErrorReserva } from '../errores';
 import { getDia } from '@/domain/getDia';
@@ -176,6 +177,56 @@ describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
     expect(vivos.find((t) => t.id === creado.turnoId)).toBeUndefined();
     const oc = await anon.rpc('ocupados', { p_desde: FECHA_TURNOS, p_hasta: FECHA_TURNOS });
     expect((oc.data as unknown[]).length).toBe(0);
+  });
+
+  it('AGENDA del panel: ve lo que reservó el cliente, marca llegó, carga a mano, cobra y cancela', async () => {
+    const fecha = mas(4);
+    const ex = await horarios.crearExcepcion({ fecha, modalidad: 'turnos', franjas: [{ desde: '09:00', hasta: '13:00' }], motivo: `${P} agenda` });
+    creado.excepcionIds.push(ex.id);
+
+    // El cliente reserva desde la página pública...
+    const r = await anon.rpc('reservar', { p_fecha: fecha, p_hora: '11:00', p_servicio: creado.servicioId, p_nombre: `${P} Agenda`, p_whatsapp: '3490000995' });
+    expect(r.error).toBeNull();
+    const reservado = (r.data as { turno_id: string }[])[0].turno_id;
+
+    // ...y el panel lo ve en la agenda, con su cliente
+    let ag = await agenda.leerAgenda(fecha);
+    const t = ag.turnos.find((x) => x.id === reservado)!;
+    expect(t).toMatchObject({ hora: '11:00', estado: 'reservado', origen: 'online' });
+    expect(t.duracionMin).toBeGreaterThan(0);
+    expect(ag.clientes.find((c) => c.id === t.clienteId)?.nombre).toBe(`${P} Agenda`);
+    expect(ag.profesionales.length).toBeGreaterThan(0);
+
+    // Marcar que llegó
+    await agenda.cambiarEstado(t.id, 'llego');
+    ag = await agenda.leerAgenda(fecha);
+    expect(ag.turnos.find((x) => x.id === t.id)?.estado).toBe('llego');
+
+    // Cargar uno a mano encima: lo rechaza la base y el mensaje es claro
+    const pisado = '11:00'; // misma hora que el turno ya tomado
+    const e1 = await agenda.crearTurnoLocal({ fecha, hora: pisado, profesionalId: creado.profesionalId, servicioId: creado.servicioId, nombre: `${P} Pisado`, whatsapp: '' }).then(() => null, (x) => x);
+    expect(codigoDe(e1)).toBe('23P01');
+    expect(describirError(e1)).toMatch(/ocupado/i);
+
+    // Cargar uno a mano libre: reutiliza al cliente por WhatsApp y queda como "local"
+    await agenda.crearTurnoLocal({ fecha, hora: '12:30', profesionalId: creado.profesionalId, servicioId: creado.servicioId, nombre: `${P} Otro nombre`, whatsapp: '3490000995' });
+    ag = await agenda.leerAgenda(fecha);
+    const manual = ag.turnos.find((x) => x.hora === '12:30')!;
+    expect(manual).toMatchObject({ origen: 'local', estado: 'reservado', clienteId: t.clienteId });
+
+    // Cobrar: pasa a atendido; cobrar de nuevo se explica
+    await agenda.cobrarTurno(t.id, 'efectivo', 1);
+    ag = await agenda.leerAgenda(fecha);
+    expect(ag.turnos.find((x) => x.id === t.id)?.estado).toBe('atendido');
+    const e2 = await agenda.cobrarTurno(t.id, 'efectivo', 1).then(() => null, (x) => x);
+    expect(describirError(e2)).toMatch(/ya no se puede cobrar/i);
+
+    // Cancelar: libera el horario; cancelar otra vez avisa que ya cambió
+    await agenda.cambiarEstado(manual.id, 'cancelado');
+    ag = await agenda.leerAgenda(fecha);
+    expect(ag.turnos.find((x) => x.id === manual.id)?.estado).toBe('cancelado');
+    const e3 = await agenda.cambiarEstado(manual.id, 'cancelado').then(() => null, (x) => x);
+    expect(codigoDe(e3)).toBe('TURNO_CAMBIO');
   });
 
   it('sin conexión: el error se reconoce como de red y el mensaje es claro', async () => {

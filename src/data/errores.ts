@@ -33,6 +33,9 @@ export function describirError(e: unknown): string {
   if (x.code === '23503') return 'No se puede hacer: hay turnos o cobros que dependen de esto.';
   if (x.code === '23514' || x.code === '22P02' || x.code === '22007') return 'Hay un dato que no es válido. Revisalo y volvé a intentar.';
   if (x.code === '23505') return 'Ya existe un registro igual.';
+  if (x.code === '23P01') return 'Ese horario ya está ocupado por otro turno.';
+  if (x.code === 'P0001' && msg === 'turno_no_cobrable') return 'Ese turno ya no se puede cobrar (ya está cobrado o cancelado).';
+  if (x.code === 'TURNO_CAMBIO') return 'Ese turno ya cambió de estado. Se actualizó la agenda: revisá y volvé a intentar.';
   return 'Algo salió mal en el servidor. Volvé a intentar en unos minutos.';
 }
 

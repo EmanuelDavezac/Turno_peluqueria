@@ -14,6 +14,8 @@ export interface Turno {
   profesionalId: string; servicioId: string; clienteId: string;
   estado: 'reservado' | 'llego' | 'atendido' | 'cancelado' | 'ausente';
   origen: 'online' | 'local';
+  /** Duración con la que se tomó el turno (si el servicio cambia después, no se mueve). Sin ella, la del servicio. */
+  duracionMin?: number;
 }
 
 export interface Cobro {

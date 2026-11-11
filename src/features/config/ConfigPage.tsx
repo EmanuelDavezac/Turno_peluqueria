@@ -61,33 +61,35 @@ export function ConfigPage() {
 
       <CatalogoSecciones />
 
-      <Seccion id="demo" titulo="Solo para la demo" ayuda="Sirve para mostrar el modo orden de llegada cualquier día de la semana y a cualquier hora.">
-        <div className="space-y-3 rounded-2xl border border-line bg-surface p-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm font-medium">
-              Simular fecha de hoy
-              <input type="date" value={hoy} onChange={(e) => s.setHoySimulado(e.target.value || null)} className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-base" />
-            </label>
-            <label className="text-sm font-medium">
-              Simular hora
-              <input type="time" value={ahora.slice(11, 16)} onChange={(e) => s.setHoraSimulada(e.target.value || null)} className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-base" />
-            </label>
+      {BACKEND === 'local' && (
+        <Seccion id="demo" titulo="Solo para la demo" ayuda="Sirve para mostrar el modo orden de llegada cualquier día de la semana y a cualquier hora.">
+          <div className="space-y-3 rounded-2xl border border-line bg-surface p-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium">
+                Simular fecha de hoy
+                <input type="date" value={hoy} onChange={(e) => s.setHoySimulado(e.target.value || null)} className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-base" />
+              </label>
+              <label className="text-sm font-medium">
+                Simular hora
+                <input type="time" value={ahora.slice(11, 16)} onChange={(e) => s.setHoraSimulada(e.target.value || null)} className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-base" />
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variante="ghost" onClick={() => { s.setHoySimulado(null); s.setHoraSimulada(null); }}>
+                Volver a fecha y hora reales
+              </Button>
+              <Button
+                variante="danger"
+                onClick={() => {
+                  if (window.confirm('Esto borra los datos cargados y vuelve a los datos de ejemplo. ¿Seguro?')) s.resetDemo();
+                }}
+              >
+                Restablecer datos de ejemplo
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variante="ghost" onClick={() => { s.setHoySimulado(null); s.setHoraSimulada(null); }}>
-              Volver a fecha y hora reales
-            </Button>
-            <Button
-              variante="danger"
-              onClick={() => {
-                if (window.confirm('Esto borra los datos cargados y vuelve a los datos de ejemplo. ¿Seguro?')) s.resetDemo();
-              }}
-            >
-              Restablecer datos de ejemplo
-            </Button>
-          </div>
-        </div>
-      </Seccion>
+        </Seccion>
+      )}
     </div>
   );
 }

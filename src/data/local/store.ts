@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { BACKEND } from '@/data/backend';
 import type { HorariosRepo } from '@/data/repositories';
 import { CLIENTES, PROFESIONALES, SEMANA_DEFAULT, SERVICIOS, generarSeed } from '@/data/seed';
 import { PLANTILLA_DEFAULT } from '@/domain/recordatorio';
 import type {
   Cliente, Cobro, Excepcion, Profesional, Servicio, Turno,
 } from '@/domain/types';
-import { ahoraISO, hoyReal, uid } from '@/lib/horas';
+import { ahoraAR, ahoraISO, hoyReal, uid } from '@/lib/horas';
 
 export type Tema = 'claro' | 'oscuro';
 export type Medio = Cobro['medio'];
@@ -199,8 +200,8 @@ export const useStore = create<Estado>()(
   ),
 );
 
-/** "Hoy" efectivo: respeta la simulación de la demo. */
-export const useHoy = (): string => useStore((s) => s.hoySimulado ?? hoyReal());
+/** "Hoy" efectivo: respeta la simulación de la demo. Con la base real no hay simulación: es la fecha de Argentina. */
+export const useHoy = (): string => useStore((s) => (BACKEND === 'supabase' ? ahoraAR().slice(0, 10) : s.hoySimulado ?? hoyReal()));
 
 /**
  * Instante actual (ISO local) respetando fecha y hora simuladas. Sin simulación
@@ -211,9 +212,10 @@ export function useAhora(): string {
   const horaSim = useStore((s) => s.horaSimulada);
   const [, tick] = useState(0);
   useEffect(() => {
-    if (horaSim) return;
+    if (horaSim && BACKEND !== 'supabase') return;
     const id = window.setInterval(() => tick((n) => n + 1), 30_000);
     return () => window.clearInterval(id);
   }, [horaSim]);
+  if (BACKEND === 'supabase') return ahoraAR();
   return ahoraISO(hoySim ?? hoyReal(), horaSim);
 }

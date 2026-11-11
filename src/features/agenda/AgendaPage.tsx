@@ -7,10 +7,11 @@ import { AvisoError, Pantalla } from '@/components/EstadoCarga';
 import { NavFecha } from '@/components/NavFecha';
 import { describirError } from '@/data/errores';
 import { useHoy } from '@/data/local/store';
+import { useAgendaDia } from '@/data/useAgendaDia';
 import { useHorarios, type HorariosVista } from '@/data/useHorarios';
 import { getDia } from '@/domain/getDia';
 import { MODALIDAD_CLASES, MODALIDAD_LABEL, formatFranjas, permiteTurnos } from '@/domain/modalidad';
-import type { Franja, Modalidad } from '@/domain/types';
+import type { DiaResuelto, Franja, Modalidad } from '@/domain/types';
 import { FranjasEditor } from '@/features/horarios/FranjasEditor';
 import { GrillaTurnos } from './GrillaTurnos';
 
@@ -112,7 +113,17 @@ function AgendaContenido({ h }: { h: HorariosVista }) {
         </p>
       )}
 
-      {permiteTurnos(dia.modalidad) && <GrillaTurnos dia={dia} hoy={hoy} />}
+      {permiteTurnos(dia.modalidad) && <AgendaDia key={dia.fecha} dia={dia} hoy={hoy} />}
     </div>
+  );
+}
+
+/** Los turnos del día: se traen al elegir la fecha, con su propio estado de carga y error. */
+function AgendaDia({ dia, hoy }: { dia: DiaResuelto; hoy: string }) {
+  const agenda = useAgendaDia(dia.fecha);
+  return (
+    <Pantalla recurso={agenda} texto="Cargando los turnos…">
+      {(a) => <GrillaTurnos dia={dia} hoy={hoy} agenda={a} />}
+    </Pantalla>
   );
 }

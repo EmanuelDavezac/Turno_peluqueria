@@ -44,7 +44,7 @@ export function bloqueosDelDia(fecha: string, turnos: Turno[], servicios: Servic
   for (const t of turnos) {
     if (t.fecha !== fecha || t.estado === 'cancelado') continue;
     const ini = toMin(t.hora);
-    out.push({ profesionalId: t.profesionalId, ini, fin: ini + duracionDe(t.servicioId, servicios) });
+    out.push({ profesionalId: t.profesionalId, ini, fin: ini + (t.duracionMin ?? duracionDe(t.servicioId, servicios)) });
   }
   return out;
 }

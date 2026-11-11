@@ -81,48 +81,50 @@ export function PanelLayout() {
       </aside>
 
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-line bg-sunken px-4 py-2 text-xs text-mute">
-          <span className="font-semibold uppercase tracking-wide">Demo</span>
-          <label className="flex items-center gap-2">
-            Simular hoy:
-            <input
-              type="date"
-              value={hoy}
-              onChange={(e) => setHoySimulado(e.target.value || null)}
-              className="rounded-md border border-line bg-surface px-2 py-1 text-ink"
-            />
-          </label>
-          <label className="flex items-center gap-2">
-            Simular hora:
-            <input
-              type="time"
-              value={ahora.slice(11, 16)}
-              onChange={(e) => setHoraSimulada(e.target.value || null)}
-              className="rounded-md border border-line bg-surface px-2 py-1 text-ink"
-            />
-          </label>
-          {((hoySimulado && hoySimulado !== hoyReal()) || horaSimulada) && (
+        {BACKEND === 'local' && (
+          <div className="flex flex-wrap items-center justify-end gap-2 border-b border-line bg-sunken px-4 py-2 text-xs text-mute">
+            <span className="font-semibold uppercase tracking-wide">Demo</span>
+            <label className="flex items-center gap-2">
+              Simular hoy:
+              <input
+                type="date"
+                value={hoy}
+                onChange={(e) => setHoySimulado(e.target.value || null)}
+                className="rounded-md border border-line bg-surface px-2 py-1 text-ink"
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              Simular hora:
+              <input
+                type="time"
+                value={ahora.slice(11, 16)}
+                onChange={(e) => setHoraSimulada(e.target.value || null)}
+                className="rounded-md border border-line bg-surface px-2 py-1 text-ink"
+              />
+            </label>
+            {((hoySimulado && hoySimulado !== hoyReal()) || horaSimulada) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setHoySimulado(null);
+                  setHoraSimulada(null);
+                }}
+                className="font-semibold underline"
+              >
+                Volver a fecha y hora reales
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
-                setHoySimulado(null);
-                setHoraSimulada(null);
+                if (window.confirm('Esto borra los datos cargados y vuelve a los datos de ejemplo. ¿Seguro?')) resetDemo();
               }}
               className="font-semibold underline"
             >
-              Volver a fecha y hora reales
+              Restablecer demo
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm('Esto borra los datos cargados y vuelve a los datos de ejemplo. ¿Seguro?')) resetDemo();
-            }}
-            className="font-semibold underline"
-          >
-            Restablecer demo
-          </button>
-        </div>
+          </div>
+        )}
         <main className="p-4 md:p-8">
           <Outlet />
         </main>

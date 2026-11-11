@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CUALQUIERA, puedeTomar, slotsDisponibles, type ParamsSlots } from './disponibilidad';
+import { CUALQUIERA, bloqueosDelDia, puedeTomar, slotsDisponibles, type ParamsSlots } from './disponibilidad';
 import type { DiaResuelto, Profesional, Servicio, Turno } from './types';
 
 const FECHA = '2026-11-10'; // martes
@@ -150,5 +150,17 @@ describe('slotsDisponibles con bloqueos precalculados (los que entrega la base)'
 
   it('un día cerrado no ofrece horarios aunque no haya bloqueos', () => {
     expect(slotsDisponibles(base({ dia: { fecha: FECHA, modalidad: 'cerrado', franjas: [] }, bloqueos: [] }))).toEqual([]);
+  });
+});
+
+describe('bloqueosDelDia', () => {
+  it('usa la duración con la que se tomó el turno, no la actual del servicio', () => {
+    // El servicio hoy dura 30 min, pero el turno se tomó de 60 min
+    const b = bloqueosDelDia(FECHA, [turno({ hora: '10:00', duracionMin: 60 })], servicios);
+    expect(b).toEqual([{ profesionalId: 'p1', ini: 600, fin: 660 }]);
+  });
+  it('sin duración propia usa la del servicio, e ignora cancelados y otros días', () => {
+    const b = bloqueosDelDia(FECHA, [turno({ hora: '10:00' }), turno({ hora: '11:00', estado: 'cancelado' }), turno({ fecha: '2026-11-11' })], servicios);
+    expect(b).toEqual([{ profesionalId: 'p1', ini: 600, fin: 630 }]);
   });
 });
