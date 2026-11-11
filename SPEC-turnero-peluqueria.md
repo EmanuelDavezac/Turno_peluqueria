@@ -1,5 +1,7 @@
 # Turnero para peluquería — Especificación para Claude Code
 
+> **Actualización — la fila virtual se quitó del producto.** Todo lo que este documento dice sobre la fila (ticket, número, espera estimada, "Llamar siguiente", gestión en la agenda, aviso de fila, `EntradaFila`) quedó **sin efecto**. Los días `llegada` y `mixto` se conservan solo como aviso informativo: el cliente ve "vení directo, sin turno" y en el panel no hay nada para gestionar. Los cobros salen únicamente de turnos. Ver `supabase/migrations/20261111010000_quitar_fila.sql`.
+
 ## Contexto
 
 Sistema de turnos para una peluquería de Esperanza (Santa Fe). Hoy usan AgendaPro y el dueño se queja de una cosa concreta: **casi toda la semana trabaja con turnos, pero los viernes atiende por orden de llegada**, y AgendaPro no le deja configurar bien que ese día es por orden de llegada.

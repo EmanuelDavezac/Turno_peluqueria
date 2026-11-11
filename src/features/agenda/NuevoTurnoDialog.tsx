@@ -14,7 +14,7 @@ export function NuevoTurnoDialog({ dia, hueco, onCerrar }: {
   hueco: { hora: string; profesionalId: string } | null;
   onCerrar: () => void;
 }) {
-  const { servicios, profesionales, turnos, fila, reservar } = useStore();
+  const { servicios, profesionales, turnos, reservar } = useStore();
   const [servicioId, setServicioId] = useState(servicios[0]?.id ?? '');
   const [nombre, setNombre] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -32,7 +32,7 @@ export function NuevoTurnoDialog({ dia, hueco, onCerrar }: {
   if (!hueco) return null;
   const servicio = servicios.find((s) => s.id === servicioId);
   const prof = profesionales.find((p) => p.id === hueco.profesionalId);
-  const entra = !!servicio && puedeTomar({ dia, servicio, servicios, turnos, fila, profesionalId: hueco.profesionalId, hora: hueco.hora });
+  const entra = !!servicio && puedeTomar({ dia, servicio, servicios, turnos, profesionalId: hueco.profesionalId, hora: hueco.hora });
 
   const guardar = () => {
     if (!servicio || !entra) return;

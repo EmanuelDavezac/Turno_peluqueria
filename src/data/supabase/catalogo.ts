@@ -48,7 +48,7 @@ export async function guardarServicio(id: string, cambios: Partial<Omit<Servicio
   if (!data?.length) throw SIN_PERMISO;
 }
 
-/** Falla con `23503` si el servicio tiene turnos, fila o cobros: la base es quien lo protege. */
+/** Falla con `23503` si el servicio tiene turnos o cobros: la base es quien lo protege. */
 export async function borrarServicio(id: string): Promise<void> {
   const { data, error } = await supabase.from('servicios').delete().eq('id', id).select('id');
   if (error) throw error;

@@ -5,7 +5,7 @@ import { useHoy, useStore } from '@/data/local/store';
 import { facturacionPorDia, porProfesional, serviciosMasPedidos } from '@/domain/reportes';
 import { formatARS } from '@/lib/format';
 import { sumarDias } from '@/lib/horas';
-import { BarrasRanking, ColumnasApiladas } from './Graficos';
+import { BarrasRanking, ColumnasPorDia } from './Graficos';
 
 const DIAS = 7;
 
@@ -29,8 +29,6 @@ export function ReportesPage() {
   const servs = useMemo(() => serviciosMasPedidos(cobros, servicios, desde, hoy), [cobros, servicios, desde, hoy]);
 
   const total = porDia.reduce((a, d) => a + d.total, 0);
-  const totalTurnos = porDia.reduce((a, d) => a + d.turnos, 0);
-  const totalLlegada = porDia.reduce((a, d) => a + d.llegada, 0);
   const cantidad = profs.reduce((a, p) => a + p.cantidad, 0);
   const totalComision = profs.reduce((a, p) => a + p.comision, 0);
   const rango = `${format(parseISO(desde), 'd MMM', { locale: es })} al ${format(parseISO(hoy), 'd MMM', { locale: es })}`;
@@ -46,24 +44,18 @@ export function ReportesPage() {
         <p className="rounded-xl border border-dashed border-line p-8 text-center text-mute">No hay cobros en los últimos 7 días.</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
             <div className="col-span-2 rounded-xl bg-brand p-4 text-brand-ink md:col-span-1">
               <p className="text-sm opacity-80">Facturación</p>
               <p className="mt-1 font-display text-4xl font-bold leading-none">{formatARS(total)}</p>
             </div>
             <Tarjeta titulo="Cobros" valor={String(cantidad)} />
             <Tarjeta titulo="Ticket promedio" valor={formatARS(Math.round(total / cantidad))} />
-            <Tarjeta
-              className="col-span-2 md:col-span-1"
-              titulo="Con turno / por llegada"
-              valor={`${Math.round((totalTurnos / total) * 100)}% / ${Math.round((totalLlegada / total) * 100)}%`}
-              detalle={`${formatARS(totalTurnos)} y ${formatARS(totalLlegada)}`}
-            />
           </div>
 
           <section aria-labelledby="r-dia" className="space-y-3">
             <h2 id="r-dia" className="text-xl font-bold">Facturación por día</h2>
-            <ColumnasApiladas datos={porDia} />
+            <ColumnasPorDia datos={porDia} />
           </section>
 
           <div className="grid gap-10 md:grid-cols-2">

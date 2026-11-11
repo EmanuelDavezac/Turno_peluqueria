@@ -24,7 +24,7 @@ export function VistaPreviaCliente({ semana, excepciones, hoy }: { semana: Confi
           const detalle =
             d.modalidad === 'cerrado'
               ? 'Cerrado'
-              : `${d.modalidad === 'llegada' ? 'Por orden de llegada' : d.modalidad === 'mixto' ? 'Turnos y fila' : 'Con turno'} · ${formatFranjas(d.franjas)}`;
+              : `${d.modalidad === 'llegada' ? 'Sin turno, por orden de llegada' : d.modalidad === 'mixto' ? 'Con turno o sin turno' : 'Con turno'} · ${formatFranjas(d.franjas)}`;
           return (
             <li key={d.fecha} className="flex gap-3 text-sm">
               <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${c.dot}`} />

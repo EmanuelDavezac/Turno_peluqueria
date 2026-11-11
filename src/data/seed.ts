@@ -1,9 +1,9 @@
 import { getDia } from '@/domain/getDia';
-import { permiteFila, permiteTurnos } from '@/domain/modalidad';
+import { permiteTurnos } from '@/domain/modalidad';
 import type {
-  Cliente, Cobro, ConfigDia, EntradaFila, Excepcion, Franja, Profesional, Servicio, Turno,
+  Cliente, Cobro, ConfigDia, Excepcion, Franja, Profesional, Servicio, Turno,
 } from '@/domain/types';
-import { ahoraISO, fromMin, sumarDias, toMin } from '@/lib/horas';
+import { fromMin, sumarDias, toMin } from '@/lib/horas';
 
 // Todo lo de este archivo son DATOS DE EJEMPLO.
 
@@ -54,15 +54,12 @@ function slotsDe(franjas: Franja[]): string[] {
 
 export interface SeedData {
   turnos: Turno[];
-  fila: EntradaFila[];
   cobros: Cobro[];
 }
 
-/** Turnos/cobros de los últimos 7 días y próximos 14, más fila de hoy si corresponde. */
-export function generarSeed(hoy: string, semana: ConfigDia[], excepciones: Excepcion[], ahora = ahoraISO(hoy)): SeedData {
-  const ahoraMin = toMin(ahora.slice(11, 16));
+/** Turnos y cobros de los últimos 7 días y próximos 14. */
+export function generarSeed(hoy: string, semana: ConfigDia[], excepciones: Excepcion[]): SeedData {
   const turnos: Turno[] = [];
-  const fila: EntradaFila[] = [];
   const cobros: Cobro[] = [];
   let k = 0;
 
@@ -91,38 +88,6 @@ export function generarSeed(hoy: string, semana: ConfigDia[], excepciones: Excep
         }
       });
     }
-
-    if (permiteFila(dia.modalidad) && (pasado || off === 0)) {
-      const base = toMin(slots[0] ?? '09:00');
-      const cant = pasado ? 9 : 5;
-      // Hoy los tiempos se anclan al "ahora" para que la fila se vea viva a cualquier hora.
-      const hoyOffsets = [-70, -45, -25, -12, -5]; // ingreso, en minutos respecto de ahora
-      for (let i = 0; i < cant; i++) {
-        const sv = SERVICIOS[(k + i) % 4];
-        const cli = CLIENTES[(k + i + 3) % CLIENTES.length];
-        const prof = PROFESIONALES[i % 2];
-        // Hoy: 2 listos, 1 atendiendo, 2 en espera.
-        const estado: EntradaFila['estado'] = pasado || i < 2 ? 'listo' : i === 2 ? 'atendiendo' : 'espera';
-        const ingreso = pasado ? base + i * 25 : Math.max(0, ahoraMin + hoyOffsets[i]);
-        const espera = pasado ? 5 + (i % 4) * 5 : estado === 'atendiendo' ? 15 : 5 + i * 3;
-        const inicio = estado === 'espera' ? undefined : ingreso + espera;
-        const fin = estado === 'listo' && inicio !== undefined ? inicio + sv.duracionMin : undefined;
-        const iso = (m: number) => `${fecha}T${fromMin(Math.min(m, 23 * 60 + 59))}:00`;
-        fila.push({
-          id: `f_seed_${k++}`, fecha, numero: i + 1, clienteNombre: cli.nombre, servicioId: sv.id,
-          profesionalId: estado === 'espera' ? undefined : prof.id,
-          estado, origen: i % 2 ? 'online' : 'local', ingresoAt: iso(ingreso),
-          inicioAt: inicio === undefined ? undefined : iso(inicio),
-          finAt: fin === undefined ? undefined : iso(fin),
-        });
-        if (fin !== undefined) {
-          cobros.push({
-            id: `cb_seed_${k}`, fecha, hora: fromMin(Math.min(fin, 23 * 60 + 59)), profesionalId: prof.id,
-            servicioId: sv.id, clienteNombre: cli.nombre, monto: sv.precio, medio: MEDIOS[k % 4], origen: 'llegada',
-          });
-        }
-      }
-    }
   }
-  return { turnos, fila, cobros };
+  return { turnos, cobros };
 }

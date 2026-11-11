@@ -50,14 +50,13 @@ export function CajaPage() {
 
       {del.length ? (
         <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
-          <table className="w-full min-w-[34rem] text-left text-sm">
+          <table className="w-full min-w-[30rem] text-left text-sm">
             <thead className="border-b border-line text-xs uppercase tracking-wide text-mute">
               <tr>
                 <th className="px-3 py-2">Hora</th>
                 <th className="px-3 py-2">Cliente</th>
                 <th className="px-3 py-2">Servicio</th>
                 <th className="px-3 py-2">Profesional</th>
-                <th className="px-3 py-2">Origen</th>
                 <th className="px-3 py-2">Medio</th>
                 <th className="px-3 py-2 text-right">Monto</th>
               </tr>
@@ -69,7 +68,6 @@ export function CajaPage() {
                   <td className="px-3 py-2 font-medium">{c.clienteNombre}</td>
                   <td className="px-3 py-2">{servicios.find((s) => s.id === c.servicioId)?.nombre}</td>
                   <td className="px-3 py-2">{profesionales.find((p) => p.id === c.profesionalId)?.nombre}</td>
-                  <td className="px-3 py-2">{c.origen === 'turno' ? 'Turno' : 'Llegada'}</td>
                   <td className="px-3 py-2">{MEDIO_LABEL[c.medio]}</td>
                   <td className="px-3 py-2 text-right font-semibold tabular-nums">{formatARS(c.monto)}</td>
                 </tr>

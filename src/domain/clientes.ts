@@ -27,6 +27,6 @@ export function buscarClientes(clientes: Cliente[], consulta: string): Cliente[]
   );
 }
 
-/** ¿Algún turno, fila o cobro referencia a este servicio? (para no borrarlo). */
+/** ¿Algún turno o cobro referencia a este servicio? (para no borrarlo). */
 export const servicioEnUso = (id: string, ...fuentes: { servicioId: string }[][]): boolean =>
   fuentes.some((lista) => lista.some((e) => e.servicioId === id));

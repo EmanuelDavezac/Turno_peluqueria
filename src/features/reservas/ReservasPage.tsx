@@ -8,13 +8,12 @@ import { describirErrorReserva } from '@/data/errores';
 import { DIAS_VISIBLES, useReservas, type ReservasVista } from '@/data/useReservas';
 import { CUALQUIERA, slotsDisponibles, type Slot } from '@/domain/disponibilidad';
 import { getDia } from '@/domain/getDia';
-import { DIAS_NOMBRE, DIAS_ORDEN, formatFranjas, permiteFila, permiteTurnos } from '@/domain/modalidad';
+import { DIAS_NOMBRE, DIAS_ORDEN, formatFranjas, permiteTurnos } from '@/domain/modalidad';
 import { armarMensaje } from '@/domain/recordatorio';
 import type { ConfigDia, Turno } from '@/domain/types';
 import { PublicLayout } from '@/layouts/PublicLayout';
 import { fechaLarga, formatARS } from '@/lib/format';
 import { sumarDias } from '@/lib/horas';
-import { FilaCliente } from './FilaCliente';
 import { TiraDias } from './TiraDias';
 
 const input = 'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-base';
@@ -258,7 +257,7 @@ function ReservasContenido({ v }: { v: ReservasVista }) {
               <div className="space-y-4">
                 {permiteTurnos(dia.modalidad) && (
                   <div>
-                    {dia.modalidad === 'mixto' && <p className="mb-2 text-sm text-mute">Elegí un horario o, si pasás sin turno, anotate en la fila.</p>}
+                    {dia.modalidad === 'mixto' && <p className="mb-2 text-sm text-mute">Elegí un horario o, si preferís, vení sin turno: se atiende por orden de llegada.</p>}
                     {slots.length ? (
                       <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Horarios disponibles">
                         {slots.map((s) => (
@@ -284,22 +283,17 @@ function ReservasContenido({ v }: { v: ReservasVista }) {
                   </div>
                 )}
 
-                {dia.modalidad === 'llegada' && !esHoy && (
+                {dia.modalidad === 'llegada' && (
                   <div className="rounded-2xl border border-llegada/40 bg-llegada-soft p-4">
-                    <p className="font-bold">Ese día no hace falta turno, vení directo.</p>
+                    <p className="font-bold">{esHoy ? 'Hoy no hace falta turno, vení directo.' : 'Ese día no hace falta turno, vení directo.'}</p>
                     <p className="text-sm">Abrimos de {formatFranjas(dia.franjas)}. Se atiende por orden de llegada.</p>
                   </div>
                 )}
 
-                {permiteFila(dia.modalidad) && esHoy && servicio && (
-                  <div className="space-y-2">
-                    {dia.modalidad === 'llegada' && <p className="font-bold">Hoy atendemos por orden de llegada.</p>}
-                    <FilaCliente dia={dia} hoy={hoy} servicioId={servicio.id} profesionalId={profesionalId} />
-                  </div>
-                )}
-
-                {dia.modalidad === 'mixto' && !esHoy && (
-                  <p className="text-sm text-mute">Ese día también podés venir sin turno: se atiende por orden de llegada.</p>
+                {dia.modalidad === 'mixto' && (
+                  <p className="text-sm text-mute">
+                    {esHoy ? 'Hoy' : 'Ese día'} también podés venir sin turno: se atiende por orden de llegada.
+                  </p>
                 )}
               </div>
             )}

@@ -11,8 +11,8 @@ export const MODALIDAD_LABEL: Record<Modalidad, string> = {
 
 export const MODALIDAD_DESC: Record<Modalidad, string> = {
   turnos: 'Solo con turno reservado',
-  llegada: 'Por orden de llegada',
-  mixto: 'Turnos y fila',
+  llegada: 'Sin turno, por orden de llegada',
+  mixto: 'Con turno o sin turno',
   cerrado: 'No abre',
 };
 
@@ -29,7 +29,6 @@ export const DIAS_NOMBRE = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves'
 export const DIAS_ORDEN: DiaSemana[] = [1, 2, 3, 4, 5, 6, 0];
 
 export const permiteTurnos = (m: Modalidad) => m === 'turnos' || m === 'mixto';
-export const permiteFila = (m: Modalidad) => m === 'llegada' || m === 'mixto';
 
 export function formatFranjas(franjas: Franja[]): string {
   const h = (s: string) => {

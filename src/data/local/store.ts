@@ -3,10 +3,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { HorariosRepo } from '@/data/repositories';
 import { CLIENTES, PROFESIONALES, SEMANA_DEFAULT, SERVICIOS, generarSeed } from '@/data/seed';
-import { llamarSiguiente as elegirSiguiente, siguienteNumero } from '@/domain/fila';
 import { PLANTILLA_DEFAULT } from '@/domain/recordatorio';
 import type {
-  Cliente, Cobro, EntradaFila, Excepcion, Profesional, Servicio, Turno,
+  Cliente, Cobro, Excepcion, Profesional, Servicio, Turno,
 } from '@/domain/types';
 import { ahoraISO, hoyReal, uid } from '@/lib/horas';
 
@@ -18,8 +17,6 @@ export interface AjustesRecordatorios {
   h24: boolean;
   /** Avisar 2 h antes del turno. */
   h2: boolean;
-  /** Avisar a quien está en la fila cuando le faltan 2 personas. */
-  fila: boolean;
   plantilla: string;
 }
 
@@ -30,7 +27,6 @@ interface Estado extends HorariosRepo {
   servicios: Servicio[];
   clientes: Cliente[];
   turnos: Turno[];
-  fila: EntradaFila[];
   cobros: Cobro[];
   /** Fechas con la caja cerrada. */
   cajasCerradas: string[];
@@ -59,16 +55,6 @@ interface Estado extends HorariosRepo {
     origen?: Turno['origen'];
   }): Turno;
   setEstadoTurno(id: string, estado: Turno['estado']): void;
-  /** Alta en la fila de hoy. Devuelve la entrada con su número. */
-  anotarFila(d: {
-    nombre?: string; whatsapp?: string; servicioId: string; profesionalPreferidoId?: string; origen?: EntradaFila['origen'];
-  }): EntradaFila;
-  salirDeFila(id: string): void;
-  marcarAusente(id: string): void;
-  /** Pasa al primero en espera que corresponda a ese profesional al sillón. */
-  llamarSiguiente(profesionalId: string): EntradaFila | undefined;
-  /** Termina la atención de la fila y registra el cobro. */
-  cobrarFila(id: string, medio: Medio, monto: number): void;
   /** Marca el turno como atendido y registra el cobro. */
   cobrarTurno(id: string, medio: Medio, monto: number): void;
   cerrarCaja(fecha: string): void;
@@ -80,16 +66,16 @@ interface Estado extends HorariosRepo {
   resetDemo(): void;
 }
 
-function estadoInicial(hoy = hoyReal(), ahora = ahoraISO(hoy)) {
+function estadoInicial(hoy = hoyReal()) {
   const semana = SEMANA_DEFAULT;
   const excepciones: Excepcion[] = [];
-  const seed = generarSeed(hoy, semana, excepciones, ahora);
+  const seed = generarSeed(hoy, semana, excepciones);
   return {
     semana, excepciones,
     profesionales: PROFESIONALES, servicios: SERVICIOS, clientes: CLIENTES,
-    turnos: seed.turnos, fila: seed.fila, cobros: seed.cobros,
+    turnos: seed.turnos, cobros: seed.cobros,
     cajasCerradas: [] as string[],
-    recordatorios: { h24: true, h2: true, fila: true, plantilla: PLANTILLA_DEFAULT } as AjustesRecordatorios,
+    recordatorios: { h24: true, h2: true, plantilla: PLANTILLA_DEFAULT } as AjustesRecordatorios,
     hoySimulado: null as string | null,
     horaSimulada: null as string | null,
   };
@@ -156,50 +142,6 @@ export const useStore = create<Estado>()(
       setEstadoTurno: (id, estado) =>
         set((s) => ({ turnos: s.turnos.map((t) => (t.id === id ? { ...t, estado } : t)) })),
 
-      anotarFila: (d) => {
-        const s = get();
-        const hoy = hoyDe(s);
-        const entrada: EntradaFila = {
-          id: uid('f'), fecha: hoy, numero: siguienteNumero(s.fila, hoy), clienteNombre: d.nombre?.trim() || 'Sin nombre',
-          whatsapp: d.whatsapp || undefined, servicioId: d.servicioId, profesionalPreferidoId: d.profesionalPreferidoId,
-          estado: 'espera', origen: d.origen ?? 'online', ingresoAt: ahoraDe(s),
-        };
-        set({ fila: [...s.fila, entrada] });
-        return entrada;
-      },
-
-      salirDeFila: (id) =>
-        set((s) => ({ fila: s.fila.map((e) => (e.id === id && e.estado === 'espera' ? { ...e, estado: 'salio' as const } : e)) })),
-
-      marcarAusente: (id) =>
-        set((s) => ({ fila: s.fila.map((e) => (e.id === id && e.estado === 'espera' ? { ...e, estado: 'ausente' as const } : e)) })),
-
-      llamarSiguiente: (profesionalId) => {
-        const s = get();
-        const ocupado = s.fila.some((e) => e.fecha === hoyDe(s) && e.estado === 'atendiendo' && e.profesionalId === profesionalId);
-        if (ocupado) return undefined;
-        const sig = elegirSiguiente(s.fila, hoyDe(s), profesionalId);
-        if (!sig) return undefined;
-        const llamado: EntradaFila = { ...sig, estado: 'atendiendo', profesionalId, inicioAt: ahoraDe(s) };
-        set({ fila: s.fila.map((e) => (e.id === sig.id ? llamado : e)) });
-        return llamado;
-      },
-
-      cobrarFila: (id, medio, monto) => {
-        const s = get();
-        const e = s.fila.find((x) => x.id === id);
-        if (!e || e.estado !== 'atendiendo' || !e.profesionalId) return;
-        const ahora = ahoraDe(s);
-        const cobro: Cobro = {
-          id: uid('cb'), fecha: e.fecha, hora: ahora.slice(11, 16), profesionalId: e.profesionalId,
-          servicioId: e.servicioId, clienteNombre: e.clienteNombre, monto, medio, origen: 'llegada',
-        };
-        set({
-          fila: s.fila.map((x) => (x.id === id ? { ...x, estado: 'listo' as const, finAt: ahora } : x)),
-          cobros: [...s.cobros, cobro],
-        });
-      },
-
       cobrarTurno: (id, medio, monto) => {
         const s = get();
         const t = s.turnos.find((x) => x.id === id);
@@ -241,7 +183,7 @@ export const useStore = create<Estado>()(
       // Conserva la fecha/hora simuladas y ancla los datos de ejemplo a ellas.
       resetDemo: () => {
         const s = get();
-        set({ ...estadoInicial(hoyDe(s), ahoraDe(s)), hoySimulado: s.hoySimulado, horaSimulada: s.horaSimulada });
+        set({ ...estadoInicial(hoyDe(s)), hoySimulado: s.hoySimulado, horaSimulada: s.horaSimulada });
       },
     }),
     // v2: agrega hora simulada, cajas cerradas y nuevo seed. Sin migración: arranca limpio.
@@ -262,7 +204,7 @@ export const useHoy = (): string => useStore((s) => s.hoySimulado ?? hoyReal());
 
 /**
  * Instante actual (ISO local) respetando fecha y hora simuladas. Sin simulación
- * de hora, se refresca solo cada 30 s para que la fila y la línea de "ahora" avancen.
+ * de hora, se refresca solo cada 30 s para que la línea de "ahora" avance.
  */
 export function useAhora(): string {
   const hoySim = useStore((s) => s.hoySimulado);

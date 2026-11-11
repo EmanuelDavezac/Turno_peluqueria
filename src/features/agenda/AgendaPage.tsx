@@ -9,10 +9,9 @@ import { describirError } from '@/data/errores';
 import { useHoy } from '@/data/local/store';
 import { useHorarios, type HorariosVista } from '@/data/useHorarios';
 import { getDia } from '@/domain/getDia';
-import { MODALIDAD_CLASES, MODALIDAD_LABEL, formatFranjas, permiteFila, permiteTurnos } from '@/domain/modalidad';
+import { MODALIDAD_CLASES, MODALIDAD_LABEL, formatFranjas, permiteTurnos } from '@/domain/modalidad';
 import type { Franja, Modalidad } from '@/domain/types';
 import { FranjasEditor } from '@/features/horarios/FranjasEditor';
-import { GestionFila } from './GestionFila';
 import { GrillaTurnos } from './GrillaTurnos';
 
 const ABRIBLES: Modalidad[] = ['turnos', 'llegada', 'mixto'];
@@ -90,7 +89,6 @@ function AgendaContenido({ h }: { h: HorariosVista }) {
   useEffect(() => setFecha(hoy), [hoy]);
 
   const dia = getDia(fecha, semana, excepciones);
-  const esHoy = fecha === hoy;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -106,17 +104,15 @@ function AgendaContenido({ h }: { h: HorariosVista }) {
 
       {dia.modalidad === 'cerrado' && <DiaCerrado fecha={fecha} motivo={dia.excepcion?.motivo} addExcepcion={h.addExcepcion} />}
 
-      <div className={dia.modalidad === 'mixto' ? 'grid gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]' : 'space-y-8'}>
-        {permiteTurnos(dia.modalidad) && <GrillaTurnos dia={dia} hoy={hoy} />}
-        {permiteFila(dia.modalidad) &&
-          (esHoy ? (
-            <GestionFila hoy={hoy} />
-          ) : (
-            <p className="rounded-xl border border-dashed border-line p-4 text-sm text-mute">
-              La fila funciona solo el día de hoy. Este día se atiende por orden de llegada.
-            </p>
-          ))}
-      </div>
+      {(dia.modalidad === 'llegada' || dia.modalidad === 'mixto') && (
+        <p className="rounded-xl border border-dashed border-line p-4 text-sm text-mute">
+          {dia.modalidad === 'llegada'
+            ? 'Este día se atiende por orden de llegada, sin turnos: no hay nada para gestionar acá.'
+            : 'Este día también se atiende sin turno, por orden de llegada. Acá se ven solo los turnos reservados.'}
+        </p>
+      )}
+
+      {permiteTurnos(dia.modalidad) && <GrillaTurnos dia={dia} hoy={hoy} />}
     </div>
   );
 }

@@ -16,16 +16,15 @@ function techoLimpio(max: number): number {
   return paso * exp;
 }
 
-const SERIE_TURNOS = 'rgb(var(--chart-turnos))';
-const SERIE_LLEGADA = 'rgb(var(--chart-llegada))';
+const SERIE = 'rgb(var(--chart-turnos))';
 const ALTO = 200; // px del área de barras
 
 /**
- * Columnas apiladas: facturación por día, turnos vs orden de llegada.
- * Marcas finas (24 px máx.), 2 px de separación entre segmentos, extremo superior redondeado de 4 px,
+ * Columnas: facturación por día.
+ * Marcas finas (24 px máx.), extremo superior redondeado de 4 px,
  * grilla en hairline. Tooltip con hover o foco; la tabla alternativa muestra todo sin tooltips.
  */
-export function ColumnasApiladas({ datos }: { datos: DiaFacturacion[] }) {
+export function ColumnasPorDia({ datos }: { datos: DiaFacturacion[] }) {
   const [activo, setActivo] = useState<number | null>(null);
   const [tabla, setTabla] = useState(false);
 
@@ -38,14 +37,7 @@ export function ColumnasApiladas({ datos }: { datos: DiaFacturacion[] }) {
   return (
     <figure className="rounded-2xl border border-line bg-surface p-4">
       <figcaption className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm" aria-label="Referencias">
-          <li className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm" style={{ background: SERIE_TURNOS }} /> Turnos
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm" style={{ background: SERIE_LLEGADA }} /> Orden de llegada
-          </li>
-        </ul>
+        <p className="text-sm text-mute">Facturación de cada día</p>
         <button type="button" onClick={() => setTabla((t) => !t)} className="text-sm font-semibold text-mute underline hover:text-ink">
           {tabla ? 'Ver gráfico' : 'Ver tabla'}
         </button>
@@ -53,12 +45,10 @@ export function ColumnasApiladas({ datos }: { datos: DiaFacturacion[] }) {
 
       {tabla ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[22rem] text-left text-sm">
+          <table className="w-full min-w-[16rem] text-left text-sm">
             <thead className="border-b border-line text-xs uppercase tracking-wide text-mute">
               <tr>
                 <th className="py-2">Día</th>
-                <th className="py-2 text-right">Turnos</th>
-                <th className="py-2 text-right">Orden de llegada</th>
                 <th className="py-2 text-right">Total</th>
               </tr>
             </thead>
@@ -66,8 +56,6 @@ export function ColumnasApiladas({ datos }: { datos: DiaFacturacion[] }) {
               {datos.map((d) => (
                 <tr key={d.fecha}>
                   <td className="py-2 capitalize">{diaCorto(d.fecha)}</td>
-                  <td className="py-2 text-right">{formatARS(d.turnos)}</td>
-                  <td className="py-2 text-right">{formatARS(d.llegada)}</td>
                   <td className="py-2 text-right font-semibold">{formatARS(d.total)}</td>
                 </tr>
               ))}
@@ -93,12 +81,7 @@ export function ColumnasApiladas({ datos }: { datos: DiaFacturacion[] }) {
               ))}
               <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${datos.length}, 1fr)` }}>
                 {datos.map((d, i) => {
-                  const hT = (d.turnos / techo) * ALTO;
-                  const hL = (d.llegada / techo) * ALTO;
-                  const segmentos = [
-                    { h: hT, color: SERIE_TURNOS },
-                    { h: hL, color: SERIE_LLEGADA },
-                  ].filter((s) => s.h > 0);
+                  const h = (d.total / techo) * ALTO;
                   return (
                     <button
                       key={d.fecha}
@@ -107,20 +90,14 @@ export function ColumnasApiladas({ datos }: { datos: DiaFacturacion[] }) {
                       onMouseLeave={() => setActivo(null)}
                       onFocus={() => setActivo(i)}
                       onBlur={() => setActivo(null)}
-                      aria-label={`${diaCorto(d.fecha)}: turnos ${formatARS(d.turnos)}, orden de llegada ${formatARS(d.llegada)}, total ${formatARS(d.total)}`}
+                      aria-label={`${diaCorto(d.fecha)}: ${formatARS(d.total)}`}
                       className="relative flex min-w-0 items-end justify-center rounded-md outline-none hover:bg-sunken focus-visible:bg-sunken focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       <span className="flex w-full max-w-6 flex-col-reverse">
-                        {segmentos.map((s, k) => (
-                          <span
-                            key={k}
-                            style={{ height: s.h, background: s.color, marginTop: k < segmentos.length - 1 ? 2 : 0 }}
-                            className={k === segmentos.length - 1 ? 'rounded-t' : ''}
-                          />
-                        ))}
+                        {h > 0 && <span style={{ height: h, background: SERIE }} className="rounded-t" />}
                       </span>
                       {i === iMax && (
-                        <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-semibold tabular-nums" style={{ bottom: hT + hL + 6 }}>
+                        <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-semibold tabular-nums" style={{ bottom: h + 6 }}>
                           {ejeARS(d.total)}
                         </span>
                       )}
@@ -128,12 +105,10 @@ export function ColumnasApiladas({ datos }: { datos: DiaFacturacion[] }) {
                         <span
                           role="tooltip"
                           className="pointer-events-none absolute left-1/2 z-10 w-44 -translate-x-1/2 rounded-lg border border-line bg-surface p-2 text-left text-xs shadow-lg"
-                          style={{ bottom: Math.min(hT + hL + 24, ALTO - 74) }}
+                          style={{ bottom: Math.min(h + 24, ALTO - 44) }}
                         >
                           <span className="block font-bold capitalize">{diaCorto(d.fecha)}</span>
-                          <span className="mt-1 flex justify-between"><span>Turnos</span><span className="tabular-nums">{formatARS(d.turnos)}</span></span>
-                          <span className="flex justify-between"><span>Llegada</span><span className="tabular-nums">{formatARS(d.llegada)}</span></span>
-                          <span className="mt-1 flex justify-between border-t border-line pt-1 font-bold"><span>Total</span><span className="tabular-nums">{formatARS(d.total)}</span></span>
+                          <span className="mt-1 block font-bold tabular-nums">{formatARS(d.total)}</span>
                         </span>
                       )}
                     </button>

@@ -18,7 +18,7 @@ export interface CatalogoVista {
   addProfesional(): Promise<void>;
   addServicio(): Promise<void>;
   removeServicio(id: string): Promise<void>;
-  /** ¿Tiene turnos, fila o cobros? Solo se sabe de antemano en la demo; en Supabase lo decide la base al borrar. */
+  /** ¿Tiene turnos o cobros? Solo se sabe de antemano en la demo; en Supabase lo decide la base al borrar. */
   servicioEnUso(id: string): boolean;
   guardado: EstadoGuardado;
   reintentarGuardado(): void;
@@ -44,7 +44,7 @@ function useCatalogoLocal(): Cargable<CatalogoVista> {
     addProfesional: async () => void s.addProfesional(),
     addServicio: async () => void s.addServicio(),
     removeServicio: async (id) => s.removeServicio(id),
-    servicioEnUso: (id) => enUsoLocal(id, s.turnos, s.fila, s.cobros),
+    servicioEnUso: (id) => enUsoLocal(id, s.turnos, s.cobros),
     guardado: { estado: 'ok' },
     reintentarGuardado: () => {},
   });
@@ -82,7 +82,7 @@ function useCatalogoSupabase(): Cargable<CatalogoVista> {
       setDatos((d) => ({ ...d, servicios: [...d.servicios, nuevo] }));
     },
     removeServicio: async (id) => {
-      // Si tiene turnos, fila o cobros la base lo rechaza (23503) y el error llega a la pantalla.
+      // Si tiene turnos o cobros la base lo rechaza (23503) y el error llega a la pantalla.
       await (await api()).borrarServicio(id);
       setDatos((d) => ({ ...d, servicios: d.servicios.filter((x) => x.id !== id) }));
     },

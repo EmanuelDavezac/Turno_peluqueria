@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CUALQUIERA, puedeTomar, slotsDisponibles, type ParamsSlots } from './disponibilidad';
-import type { DiaResuelto, EntradaFila, Profesional, Servicio, Turno } from './types';
+import type { DiaResuelto, Profesional, Servicio, Turno } from './types';
 
 const FECHA = '2026-11-10'; // martes
 const dia: DiaResuelto = {
@@ -109,58 +109,7 @@ describe('slotsDisponibles', () => {
   });
 });
 
-const enSillon = (over: Partial<EntradaFila> = {}): EntradaFila => ({
-  id: 'f1', fecha: FECHA, numero: 1, clienteNombre: 'Fila', servicioId: 'cb', profesionalId: 'p1',
-  estado: 'atendiendo', origen: 'local', ingresoAt: `${FECHA}T09:50:00`, inicioAt: `${FECHA}T10:00:00`, ...over,
-});
 const mixto: DiaResuelto = { ...dia, modalidad: 'mixto' };
-
-describe('mixto: la fila bloquea al profesional', () => {
-  // 10:10, atendiendo Corte + barba (45 min) desde las 10:00 → ocupado hasta 10:45
-  const ahora = `${FECHA}T10:10`;
-  const p = (over: Partial<ParamsSlots> = {}) => base({ dia: mixto, ahora, fila: [enSillon()], ...over });
-
-  it('no ofrece horarios que se pisan con quien está en el sillón', () => {
-    const h = horas(slotsDisponibles(p()));
-    expect(h).not.toContain('10:30'); // 10:30–11:00 pisa hasta 10:45
-    expect(h).toContain('11:00'); // ya terminó (fin estimado 10:45)
-  });
-
-  it('el bloqueo dura hasta el fin estimado del servicio, no más', () => {
-    const corto = enSillon({ servicioId: 'corte' }); // 10:00–10:30
-    const h = horas(slotsDisponibles(p({ fila: [corto] })));
-    expect(h).toContain('10:30');
-  });
-
-  it('con "cualquiera" asigna al otro profesional cuando uno está en el sillón', () => {
-    const r = slotsDisponibles(p({ profesionalId: CUALQUIERA }));
-    expect(r.find((s) => s.hora === '10:30')?.profesionalId).toBe('p2');
-  });
-
-  it('un servicio largo tampoco puede arrancar antes de que termine el sillón', () => {
-    // Color (90 min) para p1: 10:30 pisa el sillón; 11:00–12:30 entra justo en la franja
-    const h = horas(slotsDisponibles(p({ servicio: color })));
-    expect(h).not.toContain('10:30');
-    expect(h).toContain('11:00');
-  });
-
-  it('no bloquean los que esperan, ya terminaron o salieron', () => {
-    for (const estado of ['espera', 'listo', 'ausente', 'salio'] as const) {
-      const h = horas(slotsDisponibles(p({ fila: [enSillon({ estado })] })));
-      expect(h).toContain('10:30');
-    }
-  });
-
-  it('ignora la fila de otro día y la que no tiene profesional asignado', () => {
-    expect(horas(slotsDisponibles(p({ fila: [enSillon({ fecha: '2026-11-09' })] })))).toContain('10:30');
-    expect(horas(slotsDisponibles(p({ fila: [enSillon({ profesionalId: undefined })] })))).toContain('10:30');
-  });
-
-  it('no afecta al otro profesional', () => {
-    const h = horas(slotsDisponibles(p({ profesionalId: 'p2' })));
-    expect(h).toContain('10:30');
-  });
-});
 
 describe('puedeTomar (panel)', () => {
   const args = { dia, servicio: corte, servicios, turnos: [] as Turno[], profesionalId: 'p1' };
@@ -171,9 +120,11 @@ describe('puedeTomar (panel)', () => {
     expect(puedeTomar({ ...args, hora: '13:00' })).toBe(false);
     expect(puedeTomar({ ...args, hora: '12:00', servicio: barba45 })).toBe(false);
   });
-  it('rechaza si choca con un turno o con la fila', () => {
+  it('rechaza si choca con un turno', () => {
     expect(puedeTomar({ ...args, hora: '10:00', turnos: [turno({ hora: '10:00' })] })).toBe(false);
-    expect(puedeTomar({ ...args, dia: mixto, hora: '10:30', fila: [enSillon()] })).toBe(false);
+  });
+  it('en un día mixto también se puede cargar un turno', () => {
+    expect(puedeTomar({ ...args, dia: mixto, hora: '10:30' })).toBe(true);
   });
 });
 

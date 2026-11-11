@@ -42,7 +42,7 @@ function useReservasLocal(): Cargable<ReservasVista> {
     local: s.local,
     plantilla: s.recordatorios.plantilla,
     semana: s.semana, excepciones: s.excepciones, servicios: s.servicios, profesionales: s.profesionales,
-    bloqueosDe: (fecha) => bloqueosDelDia(fecha, s.turnos, s.fila, s.servicios),
+    bloqueosDe: (fecha) => bloqueosDelDia(fecha, s.turnos, s.servicios),
     refrescar: async () => {},
     reservar: async (d) => s.reservar(d),
   });

@@ -16,20 +16,11 @@ export interface Turno {
   origen: 'online' | 'local';
 }
 
-export interface EntradaFila {
-  id: string; fecha: string; numero: number;
-  clienteNombre: string; whatsapp?: string; servicioId: string;
-  profesionalPreferidoId?: string; profesionalId?: string;
-  estado: 'espera' | 'atendiendo' | 'listo' | 'ausente' | 'salio';
-  origen: 'online' | 'local';
-  ingresoAt: string; inicioAt?: string; finAt?: string;
-}
-
 export interface Cobro {
   id: string; fecha: string; hora: string;
   profesionalId: string; servicioId: string; clienteNombre: string;
   monto: number; medio: 'efectivo' | 'transferencia' | 'mercadopago' | 'debito';
-  origen: 'turno' | 'llegada';
+  origen: 'turno';
 }
 
 /** Resultado de resolver una fecha: lo que realmente rige ese día. */

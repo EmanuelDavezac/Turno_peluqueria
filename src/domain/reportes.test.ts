@@ -17,15 +17,15 @@ const servs: Servicio[] = [
 ];
 
 describe('facturacionPorDia', () => {
-  it('devuelve 7 días terminando hoy, separando turnos de llegada', () => {
+  it('devuelve 7 días terminando hoy y suma los cobros de cada día', () => {
     const r = facturacionPorDia(
-      [c({ monto: 11000 }), c({ monto: 6000, origen: 'llegada' }), c({ fecha: '2026-11-04', monto: 9000 })],
+      [c({ monto: 11000 }), c({ monto: 6000 }), c({ fecha: '2026-11-04', monto: 9000 })],
       '2026-11-06',
     );
     expect(r).toHaveLength(7);
     expect(r[0].fecha).toBe('2026-10-31');
-    expect(r[6]).toEqual({ fecha: '2026-11-06', turnos: 11000, llegada: 6000, total: 17000 });
-    expect(r.find((d) => d.fecha === '2026-11-04')?.turnos).toBe(9000);
+    expect(r[6]).toEqual({ fecha: '2026-11-06', total: 17000 });
+    expect(r.find((d) => d.fecha === '2026-11-04')?.total).toBe(9000);
   });
 
   it('los días sin cobros aparecen en cero y se ignora lo fuera de rango', () => {

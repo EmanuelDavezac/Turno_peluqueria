@@ -4,7 +4,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { MEDIOS, MEDIO_LABEL, type Medio } from '@/domain/caja';
 import { formatARS } from '@/lib/format';
 
-/** Cobro de un servicio (turno o fila): medio de pago y monto. */
+/** Cobro de un servicio: medio de pago y monto. */
 export function CobroDialog({ abierto, titulo, detalle, montoInicial, onConfirmar, onCerrar }: {
   abierto: boolean;
   titulo: string;

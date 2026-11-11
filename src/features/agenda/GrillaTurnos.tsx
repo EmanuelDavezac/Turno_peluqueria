@@ -16,7 +16,7 @@ const RAYADO = {
 
 /** Grilla de turnos: una columna por profesional, franjas cerradas rayadas y línea de "ahora". */
 export function GrillaTurnos({ dia, hoy }: { dia: DiaResuelto; hoy: string }) {
-  const { profesionales, turnos, servicios, clientes, fila } = useStore();
+  const { profesionales, turnos, servicios, clientes } = useStore();
   const ahora = useAhora();
   const [nuevo, setNuevo] = useState<{ hora: string; profesionalId: string } | null>(null);
   const [turnoSel, setTurnoSel] = useState<string | null>(null);
@@ -30,9 +30,8 @@ export function GrillaTurnos({ dia, hoy }: { dia: DiaResuelto; hoy: string }) {
   const franjas = [...dia.franjas].sort((a, b) => toMin(a.desde) - toMin(b.desde));
   const siestas = franjas.slice(1).map((f, i) => ({ desde: toMin(franjas[i].hasta), hasta: toMin(f.desde) })).filter((s) => s.hasta > s.desde);
 
-  const bloqueos = bloqueosDelDia(dia.fecha, turnos, fila, servicios);
+  const bloqueos = bloqueosDelDia(dia.fecha, turnos, servicios);
   const delDia = turnos.filter((t) => t.fecha === dia.fecha && t.estado !== 'cancelado');
-  const enSillon = fila.filter((e) => e.fecha === dia.fecha && e.estado === 'atendiendo' && e.profesionalId && e.inicioAt);
 
   const ahoraMin = toMin(ahora.slice(11, 16));
   const lineaAhora = dia.fecha === hoy && ahoraMin >= inicio && ahoraMin <= fin;
@@ -122,23 +121,6 @@ export function GrillaTurnos({ dia, hoy }: { dia: DiaResuelto; hoy: string }) {
                   );
                 })}
 
-              {/* fila: quien está en el sillón ocupa al profesional (días mixtos) */}
-              {enSillon
-                .filter((e) => e.profesionalId === p.id)
-                .map((e) => {
-                  const ini = toMin(e.inicioAt!.slice(11, 16));
-                  const dur = servicios.find((s) => s.id === e.servicioId)?.duracionMin ?? PASO_MIN;
-                  return (
-                    <div
-                      key={e.id}
-                      className="absolute inset-x-1 z-10 overflow-hidden rounded-lg border-2 border-dashed border-llegada bg-llegada-soft px-2 py-1 text-xs leading-tight text-llegada"
-                      style={{ top: y(ini) + 1, height: dur * PX_MIN - 2 }}
-                    >
-                      <span className="block truncate font-bold">Fila #{e.numero} · {e.clienteNombre}</span>
-                      <span className="block truncate">en atención hasta ~{fromMin(ini + dur)}</span>
-                    </div>
-                  );
-                })}
 
               {lineaAhora && (
                 <div className="pointer-events-none absolute inset-x-0 z-20 h-0.5 bg-red-500" style={{ top: y(ahoraMin) }}>

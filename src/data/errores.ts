@@ -30,7 +30,7 @@ export function describirError(e: unknown): string {
   if (x.code === '42501' || x.code === 'PGRST301' || x.status === 401 || x.status === 403 || /jwt/i.test(msg)) {
     return 'Tu sesión venció o no tenés permiso para esto. Volvé a iniciar sesión.';
   }
-  if (x.code === '23503') return 'No se puede hacer: hay turnos, fila o cobros que dependen de esto.';
+  if (x.code === '23503') return 'No se puede hacer: hay turnos o cobros que dependen de esto.';
   if (x.code === '23514' || x.code === '22P02' || x.code === '22007') return 'Hay un dato que no es válido. Revisalo y volvé a intentar.';
   if (x.code === '23505') return 'Ya existe un registro igual.';
   return 'Algo salió mal en el servidor. Volvé a intentar en unos minutos.';

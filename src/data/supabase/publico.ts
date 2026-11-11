@@ -41,7 +41,7 @@ export async function leerPublico(): Promise<DatosPublicos> {
   };
 }
 
-/** Rangos ocupados por día (turnos vivos y quien está en el sillón), sin nombres ni teléfonos. */
+/** Rangos ocupados por día (turnos vivos), sin nombres ni teléfonos. */
 export async function leerOcupados(desde: string, hasta: string): Promise<Record<string, Bloqueo[]>> {
   const { data, error } = await supabase.rpc('ocupados', { p_desde: desde, p_hasta: hasta });
   if (error) throw error;

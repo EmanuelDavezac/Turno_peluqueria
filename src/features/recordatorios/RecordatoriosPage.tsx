@@ -45,12 +45,6 @@ export function RecordatoriosPage() {
         <div className="divide-y divide-line rounded-2xl border border-line bg-surface px-4">
           <Toggle label="24 horas antes" descripcion="Recordatorio el día anterior al turno." checked={recordatorios.h24} onChange={(v) => setRecordatorios({ h24: v })} />
           <Toggle label="2 horas antes" descripcion="Aviso corto el mismo día." checked={recordatorios.h2} onChange={(v) => setRecordatorios({ h2: v })} />
-          <Toggle
-            label="Aviso de fila"
-            descripcion={'Cuando a alguien de la fila le faltan 2 personas: "Te faltan 2 personas, andá acercándote".'}
-            checked={recordatorios.fila}
-            onChange={(v) => setRecordatorios({ fila: v })}
-          />
         </div>
       </section>
 

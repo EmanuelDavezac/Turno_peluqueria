@@ -3,24 +3,17 @@ import type { Cobro, Profesional, Servicio } from './types';
 
 export interface DiaFacturacion {
   fecha: string;
-  turnos: number;
-  llegada: number;
   total: number;
 }
 
-/** Facturación de los últimos `dias` días (incluye hoy), separando turnos de orden de llegada. Siempre devuelve todos los días, aunque estén en 0. */
+/** Facturación de los últimos `dias` días (incluye hoy). Siempre devuelve todos los días, aunque estén en 0. */
 export function facturacionPorDia(cobros: Cobro[], hoy: string, dias = 7): DiaFacturacion[] {
   const out: DiaFacturacion[] = [];
   for (let i = dias - 1; i >= 0; i--) {
     const fecha = sumarDias(hoy, -i);
-    let turnos = 0;
-    let llegada = 0;
-    for (const c of cobros) {
-      if (c.fecha !== fecha) continue;
-      if (c.origen === 'turno') turnos += c.monto;
-      else llegada += c.monto;
-    }
-    out.push({ fecha, turnos, llegada, total: turnos + llegada });
+    let total = 0;
+    for (const c of cobros) if (c.fecha === fecha) total += c.monto;
+    out.push({ fecha, total });
   }
   return out;
 }

@@ -165,7 +165,7 @@ function CatalogoContenido({ c }: { c: CatalogoVista }) {
                 <button
                   type="button"
                   aria-label={`Borrar ${sv.nombre}`}
-                  title={enUso ? 'Tiene turnos, fila o cobros: no se puede borrar' : 'Borrar servicio'}
+                  title={enUso ? 'Tiene turnos o cobros: no se puede borrar' : 'Borrar servicio'}
                   disabled={enUso || c.servicios.length <= 1}
                   onClick={() => void ejecutar(() => c.removeServicio(sv.id))}
                   className="rounded-lg p-2 text-mute hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"

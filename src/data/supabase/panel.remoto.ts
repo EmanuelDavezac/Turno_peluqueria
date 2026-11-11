@@ -29,7 +29,7 @@ const WSP = '3490000999'; // número de prueba
 
 const creado = {
   profesionalId: '', servicioId: '', servicioLibreId: '',
-  excepcionIds: [] as string[], turnoId: '', filaId: '',
+  excepcionIds: [] as string[], turnoId: '',
 };
 
 describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
@@ -42,7 +42,6 @@ describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
     // Deja el remoto sin configuración de prueba activa: las excepciones se sacan; lo demás lo lista para borrar.
     for (const id of creado.excepcionIds) await horarios.borrarExcepcion(id).catch(() => {});
     if (creado.turnoId) await horarios.cancelarTurnos([creado.turnoId]).catch(() => {});
-    if (creado.filaId) await anon.rpc('salir_de_fila', { p_id: creado.filaId });
     console.log('\n=== DATOS DE PRUEBA QUE QUEDARON EN EL REMOTO ===\n' + JSON.stringify(creado, null, 2));
     await supabase.auth.signOut();
   });
@@ -138,7 +137,7 @@ describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
     expect((await anon.from('excepciones').select('id').eq('fecha', FECHA_TURNOS)).data).toHaveLength(1);
     const pro = await anon.from('profesionales').select('id, nombre, activo').eq('id', creado.profesionalId);
     expect(pro.data).toHaveLength(1);
-    for (const t of ['turnos', 'clientes', 'fila', 'cobros', 'cajas_cerradas']) {
+    for (const t of ['turnos', 'clientes', 'cobros', 'cajas_cerradas']) {
       const r = await anon.from(t).select('*').limit(1);
       expect(r.error?.code, t).toBe('42501');
     }
@@ -177,25 +176,6 @@ describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
     expect(vivos.find((t) => t.id === creado.turnoId)).toBeUndefined();
     const oc = await anon.rpc('ocupados', { p_desde: FECHA_TURNOS, p_hasta: FECHA_TURNOS });
     expect((oc.data as unknown[]).length).toBe(0);
-  });
-
-  it('anotar_fila (anónimo): hoy con excepción "llegada"', async () => {
-    const e = await horarios.crearExcepcion({ fecha: hoyAR, modalidad: 'llegada', franjas: [{ desde: '00:00', hasta: '23:59' }], motivo: `${P} fila` });
-    creado.excepcionIds.push(e.id);
-    const r = await anon.rpc('anotar_fila', { p_servicio: creado.servicioId, p_nombre: `${P} Fila`, p_whatsapp: null, p_preferido: null });
-    expect(r.error).toBeNull();
-    const f = (r.data as { entrada_id: string; numero_fila: number }[])[0];
-    creado.filaId = f.entrada_id;
-    expect(f.numero_fila).toBeGreaterThan(0);
-
-    const t = await anon.rpc('mi_ticket', { p_id: f.entrada_id });
-    expect(t.error).toBeNull();
-    const est = await anon.rpc('estado_fila_publico');
-    expect((est.data as { en_espera: number }[])[0].en_espera).toBeGreaterThanOrEqual(1);
-
-    const s = await anon.rpc('salir_de_fila', { p_id: f.entrada_id });
-    expect(s.data).toBe(true);
-    creado.filaId = '';
   });
 
   it('sin conexión: el error se reconoce como de red y el mensaje es claro', async () => {
