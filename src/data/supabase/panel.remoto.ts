@@ -9,6 +9,9 @@ import { codigoDe, describirError, esErrorDeRed } from '../errores';
 import * as catalogo from './catalogo';
 import { supabase } from './client';
 import * as horarios from './horarios';
+import * as publico from './publico';
+import { describirErrorReserva } from '../errores';
+import { getDia } from '@/domain/getDia';
 
 const URL = process.env.VITE_SUPABASE_URL!;
 const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY!;
@@ -113,6 +116,21 @@ describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
     const lista = (await horarios.leerHorarios()).excepciones.filter((x) => x.fecha === FECHA_TURNOS);
     expect(lista).toHaveLength(1);
     expect(lista[0]).toMatchObject({ modalidad: 'turnos', motivo: `${P} b` });
+  });
+
+  it('día CERRADO: la página pública lo ve cerrado y la base rechaza reservarlo (dia_cerrado)', async () => {
+    const fecha = mas(5);
+    const e = await horarios.crearExcepcion({ fecha, modalidad: 'cerrado', franjas: [], motivo: `${P} cerrado` });
+    creado.excepcionIds.push(e.id);
+
+    // Lo que lee la página de reservas es lo mismo que guardó el panel
+    const pub = await publico.leerPublico();
+    expect(getDia(fecha, pub.semana, pub.excepciones).modalidad).toBe('cerrado');
+
+    // Aunque alguien intente reservar igual (página desactualizada, llamada directa), la base lo rechaza
+    const r = await anon.rpc('reservar', { p_fecha: fecha, p_hora: '10:00', p_servicio: creado.servicioId, p_nombre: `${P} Cerrado`, p_whatsapp: '3490000997' });
+    expect(r.error?.message).toBe('dia_cerrado');
+    expect(describirErrorReserva(r.error)).toMatchObject({ texto: expect.stringMatching(/cerrado/i), refrescar: true });
   });
 
   it('el público lee servicios y horarios, y NO lee datos privados ni la comisión', async () => {

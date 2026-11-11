@@ -1,3 +1,4 @@
+import type { Bloqueo } from '@/domain/disponibilidad';
 import type { ConfigDia, DiaSemana, Excepcion, Franja, Modalidad, Profesional, Servicio, Turno } from '@/domain/types';
 
 /**
@@ -51,4 +52,18 @@ export function deServicio(c: Partial<Omit<Servicio, 'id'>>): Record<string, unk
   if (c.duracionMin !== undefined) o.duracion_min = c.duracionMin;
   if (c.precio !== undefined) o.precio = c.precio;
   return o;
+}
+
+/** Lo que ve el público de un profesional: sin color ni comisión (son privados). */
+export interface FilaProfesionalPublica { id: string; nombre: string; activo: boolean }
+export const aProfesionalPublico = (f: FilaProfesionalPublica): Profesional => ({
+  id: f.id, nombre: f.nombre, color: '#2a6f6b', comisionPct: 0, activo: f.activo,
+});
+
+/** `ocupados()`: rangos ocupados por día, sin datos personales. */
+export interface FilaOcupado { fecha: string; profesional_id: string; ini: number; fin: number }
+export function aBloqueosPorFecha(filas: FilaOcupado[]): Record<string, Bloqueo[]> {
+  const out: Record<string, Bloqueo[]> = {};
+  for (const f of filas) (out[f.fecha] ??= []).push({ profesionalId: f.profesional_id, ini: f.ini, fin: f.fin });
+  return out;
 }

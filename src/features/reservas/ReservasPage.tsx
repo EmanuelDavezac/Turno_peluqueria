@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ModalidadBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { WhatsAppBubble } from '@/components/WhatsAppBubble';
-import { useAhora, useHoy, useStore } from '@/data/local/store';
+import { Pantalla } from '@/components/EstadoCarga';
+import { describirErrorReserva } from '@/data/errores';
+import { DIAS_VISIBLES, useReservas, type ReservasVista } from '@/data/useReservas';
 import { CUALQUIERA, slotsDisponibles, type Slot } from '@/domain/disponibilidad';
 import { getDia } from '@/domain/getDia';
 import { DIAS_NOMBRE, DIAS_ORDEN, formatFranjas, permiteFila, permiteTurnos } from '@/domain/modalidad';
@@ -15,7 +17,6 @@ import { sumarDias } from '@/lib/horas';
 import { FilaCliente } from './FilaCliente';
 import { TiraDias } from './TiraDias';
 
-const DIAS_VISIBLES = 14;
 const input = 'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-base';
 const opcion = (activo: boolean) =>
   `w-full rounded-xl border p-3 text-left transition ${activo ? 'border-2 border-brand bg-surface' : 'border-line bg-surface hover:bg-sunken'}`;
@@ -51,9 +52,20 @@ function agruparSemana(semana: ConfigDia[]) {
 }
 
 export function ReservasPage() {
-  const { semana, excepciones, servicios, profesionales, turnos, fila, local, recordatorios, reservar } = useStore();
-  const hoy = useHoy();
-  const ahora = useAhora();
+  const reservas = useReservas();
+  // Mientras carga o si falla la conexión, se ve igual la página (con estado y Reintentar), nunca en blanco.
+  if (reservas.estado !== 'listo') {
+    return (
+      <PublicLayout>
+        <Pantalla recurso={reservas} texto="Cargando horarios…">{() => null}</Pantalla>
+      </PublicLayout>
+    );
+  }
+  return <ReservasContenido v={reservas.datos} />;
+}
+
+function ReservasContenido({ v }: { v: ReservasVista }) {
+  const { semana, excepciones, servicios, profesionales, local, hoy, ahora } = v;
 
   const [servicioId, setServicioId] = useState<string | null>(null);
   // El servicio elegido se muestra resumido; "Cambiar" vuelve a abrir la lista.
@@ -63,6 +75,9 @@ export function ReservasPage() {
   const [nombre, setNombre] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [error, setError] = useState('');
+  // Fallo que viene del servidor (día cerrado, horario tomado…): se muestra arriba, porque el paso 3 puede desaparecer.
+  const [falloReserva, setFalloReserva] = useState('');
+  const [enviando, setEnviando] = useState(false);
   const [turno, setTurno] = useState<Turno | null>(null);
   const diaRef = useRef<HTMLDivElement>(null);
   const datosRef = useRef<HTMLDivElement>(null);
@@ -88,9 +103,10 @@ export function ReservasPage() {
   const slots = useMemo(
     () =>
       dia && servicio
-        ? slotsDisponibles({ dia, servicio, profesionalId, profesionales, servicios, turnos, fila, ahora })
+        ? slotsDisponibles({ dia, servicio, profesionalId, profesionales, servicios, turnos: [], bloqueos: v.bloqueosDe(dia.fecha), ahora })
         : [],
-    [dia, servicio, profesionalId, profesionales, servicios, turnos, fila, ahora],
+    // `v` es un objeto nuevo en cada render: se miran solo los datos que cambian los horarios.
+    [dia, servicio, profesionalId, profesionales, servicios, ahora, v.bloqueosDe(dia?.fecha ?? '')],
   );
 
   useEffect(() => {
@@ -108,23 +124,41 @@ export function ReservasPage() {
   const elegirSlot = (s: Slot) => {
     setSlot(s);
     setError('');
+    setFalloReserva('');
   };
 
-  const confirmar = () => {
-    if (!servicio || !dia || !slot) return;
+  const confirmar = async () => {
+    if (!servicio || !dia || !slot || enviando) return;
     if (!nombre.trim()) return setError('Escribí tu nombre.');
     if (whatsapp.replace(/\D/g, '').length < 8) return setError('Escribí un WhatsApp válido (con característica).');
-    const t = reservar({
-      fecha: dia.fecha, hora: slot.hora, profesionalId: slot.profesionalId, servicioId: servicio.id,
-      nombre: nombre.trim(), whatsapp: whatsapp.trim(),
-    });
-    setTurno(t);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setError('');
+    setFalloReserva('');
+    setEnviando(true);
+    try {
+      const t = await v.reservar({
+        fecha: dia.fecha, hora: slot.hora, profesionalId: slot.profesionalId, servicioId: servicio.id,
+        nombre: nombre.trim(), whatsapp: whatsapp.trim(),
+      });
+      setTurno(t);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+      // La base es la que decide: si el día se cerró o el horario ya no está, se explica y se actualizan los horarios.
+      const { texto, refrescar } = describirErrorReserva(e);
+      if (refrescar) {
+        setSlot(null);
+        setFalloReserva(texto);
+        void v.refrescar().catch(() => {});
+      } else {
+        setError(texto);
+      }
+    } finally {
+      setEnviando(false);
+    }
   };
 
   const reiniciar = () => {
     setTurno(null); setSlot(null); setFecha(null); setServicioId(null); setEligiendoServicio(true);
-    setNombre(''); setWhatsapp(''); setError('');
+    setNombre(''); setWhatsapp(''); setError(''); setFalloReserva('');
   };
 
   const cabecera = (
@@ -146,7 +180,7 @@ export function ReservasPage() {
   // ---------- Confirmación ----------
   if (turno && servicio) {
     const prof = profesionales.find((p) => p.id === turno.profesionalId);
-    const mensaje = armarMensaje(recordatorios.plantilla, {
+    const mensaje = armarMensaje(v.plantilla, {
       nombre: nombre.trim().split(' ')[0], local: local.nombre, dia: fechaLarga(turno.fecha),
       hora: turno.hora, profesional: prof?.nombre ?? '',
     });
@@ -178,6 +212,11 @@ export function ReservasPage() {
     <PublicLayout>
       {cabecera}
       <div className="space-y-8">
+        {falloReserva && (
+          <p role="alert" className="rounded-xl border border-red-300 bg-surface px-4 py-3 text-sm font-medium text-red-700">
+            {falloReserva}
+          </p>
+        )}
         <Paso n={1} titulo="¿Qué servicio querés?">
           {servicio && !eligiendoServicio ? (
             <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-brand bg-surface p-3">
@@ -213,7 +252,7 @@ export function ReservasPage() {
         {servicio && (
           <div ref={diaRef} className="scroll-mt-4">
           <Paso n={2} titulo="¿Qué día?">
-            <TiraDias dias={dias} hoy={hoy} seleccionado={dia?.fecha ?? null} onElegir={(f) => { setFecha(f); setSlot(null); }} />
+            <TiraDias dias={dias} hoy={hoy} seleccionado={dia?.fecha ?? null} onElegir={(f) => { setFecha(f); setSlot(null); setFalloReserva(''); void v.refrescar().catch(() => {}); }} />
 
             {dia && (
               <div className="space-y-4">
@@ -284,8 +323,8 @@ export function ReservasPage() {
                   <input className={`${input} mt-1`} value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="3496 ..." />
                 </label>
                 {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
-                <Button className="w-full py-3 text-base" onClick={confirmar}>
-                  Confirmar turno
+                <Button className="w-full py-3 text-base" onClick={() => void confirmar()} disabled={enviando}>
+                  {enviando ? 'Reservando…' : 'Confirmar turno'}
                 </Button>
               </div>
             </Paso>

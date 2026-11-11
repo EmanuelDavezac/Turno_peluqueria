@@ -176,3 +176,28 @@ describe('puedeTomar (panel)', () => {
     expect(puedeTomar({ ...args, dia: mixto, hora: '10:30', fila: [enSillon()] })).toBe(false);
   });
 });
+
+describe('slotsDisponibles con bloqueos precalculados (los que entrega la base)', () => {
+  it('descuenta los rangos ocupados sin necesitar los turnos', () => {
+    const h = horas(slotsDisponibles(base({ bloqueos: [{ profesionalId: 'p1', ini: 600, fin: 630 }] }))); // 10:00–10:30
+    expect(h).toContain('09:30');
+    expect(h).not.toContain('10:00');
+    expect(h).toContain('10:30');
+  });
+
+  it('un bloqueo de otro profesional no afecta, y con "cualquiera" se asigna el libre', () => {
+    const b = [{ profesionalId: 'p1', ini: 600, fin: 630 }];
+    expect(horas(slotsDisponibles(base({ bloqueos: b, profesionalId: 'p2' })))).toContain('10:00');
+    const s = slotsDisponibles(base({ bloqueos: b, profesionalId: CUALQUIERA })).find((x) => x.hora === '10:00');
+    expect(s?.profesionalId).toBe('p2');
+  });
+
+  it('si vienen bloqueos, mandan sobre los turnos', () => {
+    const h = horas(slotsDisponibles(base({ turnos: [turno({ hora: '10:00' })], bloqueos: [] })));
+    expect(h).toContain('10:00');
+  });
+
+  it('un día cerrado no ofrece horarios aunque no haya bloqueos', () => {
+    expect(slotsDisponibles(base({ dia: { fecha: FECHA, modalidad: 'cerrado', franjas: [] }, bloqueos: [] }))).toEqual([]);
+  });
+});

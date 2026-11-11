@@ -16,6 +16,14 @@ export const hoyReal = (): string => format(new Date(), ISO);
  */
 export const ahoraISO = (hoy: string, horaSimulada?: string | null): string =>
   `${hoy}T${horaSimulada ? `${horaSimulada}:00` : format(new Date(), 'HH:mm:ss')}`;
+/** Instante actual en hora de Argentina ("yyyy-MM-ddTHH:mm:ss"), sin depender de la zona de la computadora. */
+export const ahoraAR = (d: Date = new Date()): string =>
+  new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  })
+    .format(d)
+    .replace(' ', 'T');
 export const sumarDias = (fecha: string, n: number): string => format(addDays(parseISO(fecha), n), ISO);
 
 /** Franja válida: desde < hasta. */

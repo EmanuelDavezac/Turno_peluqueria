@@ -35,3 +35,30 @@ export function describirError(e: unknown): string {
   if (x.code === '23505') return 'Ya existe un registro igual.';
   return 'Algo salió mal en el servidor. Volvé a intentar en unos minutos.';
 }
+
+/**
+ * Errores de negocio de `reservar` (llegan como `raise exception '<codigo>'`, SQLSTATE P0001).
+ * `refrescar` = lo que el cliente veía estaba desactualizado: conviene volver a pedir horarios y ocupados.
+ */
+const RESERVA: Record<string, { texto: string; refrescar: boolean }> = {
+  nombre_invalido: { texto: 'Escribí tu nombre.', refrescar: false },
+  whatsapp_invalido: { texto: 'Escribí un WhatsApp válido (con característica).', refrescar: false },
+  horario_pasado: { texto: 'Ese horario ya pasó. Elegí otro.', refrescar: true },
+  fecha_fuera_de_rango: { texto: 'Todavía no se pueden sacar turnos para esa fecha.', refrescar: true },
+  servicio_inexistente: { texto: 'Ese servicio ya no está disponible. Elegí otro.', refrescar: true },
+  dia_cerrado: { texto: 'Ese día el local está cerrado. Elegí otro día.', refrescar: true },
+  dia_sin_turnos: { texto: 'Ese día se atiende por orden de llegada, sin turno.', refrescar: true },
+  fuera_de_horario: { texto: 'Ese horario ya no está disponible. Elegí otro.', refrescar: true },
+  horario_invalido: { texto: 'Ese horario no es válido. Elegí otro.', refrescar: true },
+  sin_profesionales: { texto: 'Por ahora no se pueden sacar turnos. Probá más tarde.', refrescar: true },
+  horario_ocupado: { texto: 'Alguien acaba de tomar ese horario. Elegí otro.', refrescar: true },
+  tope_turnos: { texto: 'Ya tenés el máximo de turnos reservados con ese WhatsApp.', refrescar: false },
+};
+
+export function describirErrorReserva(e: unknown): { texto: string; refrescar: boolean } {
+  const msg = (e as { message?: string } | null)?.message ?? '';
+  const code = codigoDe(e);
+  if (code === 'P0001' && RESERVA[msg]) return RESERVA[msg];
+  // Cualquier otra cosa (red, sesión…) se explica igual que en el resto de la app.
+  return { texto: describirError(e), refrescar: false };
+}

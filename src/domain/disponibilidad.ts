@@ -30,6 +30,11 @@ export interface ParamsSlots {
   fila?: EntradaFila[];
   /** Instante actual, ISO local "yyyy-MM-ddTHH:mm[:ss]". Solo importa si `dia.fecha` es hoy. */
   ahora: string;
+  /**
+   * Bloqueos ya calculados de ese día. La base los entrega sin datos personales (`ocupados()`);
+   * si vienen, reemplazan a los que se derivarían de `turnos` y `fila`.
+   */
+  bloqueos?: Bloqueo[];
 }
 
 const duracionDe = (servicioId: string, servicios: Servicio[]): number =>
@@ -78,7 +83,7 @@ export function slotsDisponibles(p: ParamsSlots): Slot[] {
       : profesionales.filter((x) => x.activo && x.id === profesionalId);
   if (!candidatos.length) return [];
 
-  const bloqueos = bloqueosDelDia(dia.fecha, turnos, p.fila ?? [], servicios);
+  const bloqueos = p.bloqueos ?? bloqueosDelDia(dia.fecha, turnos, p.fila ?? [], servicios);
   const esHoy = ahora.slice(0, 10) === dia.fecha;
   const ahoraMin = esHoy ? toMin(ahora.slice(11, 16)) : -1;
 

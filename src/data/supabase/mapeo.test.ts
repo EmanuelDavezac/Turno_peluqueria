@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aExcepcion, aProfesional, aSemana, aServicio, aTurno, deProfesional, deServicio } from './mapeo';
+import { aBloqueosPorFecha, aProfesionalPublico, aExcepcion, aProfesional, aSemana, aServicio, aTurno, deProfesional, deServicio } from './mapeo';
 
 describe('mapeo base → dominio', () => {
   it('semana: franjas null pasa a []', () => {
@@ -44,5 +44,21 @@ describe('mapeo dominio → base', () => {
   it('un valor 0 o false se manda (no se confunde con "sin cambio")', () => {
     expect(deServicio({ precio: 0 })).toEqual({ precio: 0 });
     expect(deProfesional({ activo: false, comisionPct: 0 })).toEqual({ activo: false, comision_pct: 0 });
+  });
+});
+
+describe('mapeo público', () => {
+  it('ocupados: agrupa por fecha y pasa a camelCase', () => {
+    const r = aBloqueosPorFecha([
+      { fecha: '2026-11-14', profesional_id: 'a', ini: 600, fin: 645 },
+      { fecha: '2026-11-14', profesional_id: 'b', ini: 660, fin: 690 },
+      { fecha: '2026-11-15', profesional_id: 'a', ini: 540, fin: 570 },
+    ]);
+    expect(Object.keys(r)).toEqual(['2026-11-14', '2026-11-15']);
+    expect(r['2026-11-14']).toEqual([{ profesionalId: 'a', ini: 600, fin: 645 }, { profesionalId: 'b', ini: 660, fin: 690 }]);
+    expect(aBloqueosPorFecha([])).toEqual({});
+  });
+  it('profesional público: sin comisión (es privada)', () => {
+    expect(aProfesionalPublico({ id: 'p', nombre: 'Ana', activo: true })).toMatchObject({ id: 'p', nombre: 'Ana', comisionPct: 0, activo: true });
   });
 });
