@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 /**
  * Pruebas de integración contra el proyecto Supabase REMOTO (crean datos con prefijo ZZ-PRUEBA).
  * No forman parte de `npm test`. Correr con: npm run test:remoto
- * Credenciales del usuario de prueba del panel: `email` y `contraseña` en .env.local (ignorado por git).
+ * Credenciales del usuario de prueba del panel: PRUEBA_EMAIL y PRUEBA_PASSWORD en .env.local (ignorado por git).
  */
 function leerEnvLocal(): Record<string, string> {
   const out: Record<string, string> = {};
@@ -28,8 +28,8 @@ export default defineConfig({
     env: {
       VITE_SUPABASE_URL: env.VITE_SUPABASE_URL ?? '',
       VITE_SUPABASE_PUBLISHABLE_KEY: env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
-      PRUEBA_EMAIL: env.email ?? '',
-      PRUEBA_PASSWORD: env['contraseña'] ?? '',
+      PRUEBA_EMAIL: env.PRUEBA_EMAIL ?? '',
+      PRUEBA_PASSWORD: env.PRUEBA_PASSWORD ?? '',
     },
   },
 });

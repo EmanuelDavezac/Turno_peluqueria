@@ -1,6 +1,7 @@
 import { Lock } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
+import { describirError, esErrorDeRed } from '@/data/errores';
 import { llegoPorRecuperacion, supabase } from '@/data/supabase/client';
 import { useStore } from '@/data/local/store';
 
@@ -11,6 +12,7 @@ type Estado =
   | { fase: 'cargando' }
   | { fase: 'sin_sesion' }
   | { fase: 'recuperando' } // llegó por el link del mail para elegir una contraseña nueva
+  | { fase: 'fallo'; mensaje: string } // no se pudo verificar el acceso (sin conexión, sesión vencida…)
   | { fase: 'sin_acceso'; email: string } // tiene cuenta pero no está en usuarios_panel
   | { fase: 'ok' };
 
@@ -19,7 +21,8 @@ const input = 'mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2.5 
 export const cerrarSesion = () => supabase.auth.signOut();
 
 /** Traduce los errores de Auth. No distingue "mail inexistente" de "clave mala" a propósito. */
-function mensajeError(msg: string, status?: number): string {
+function mensajeError(msg: string, status?: number, err?: unknown): string {
+  if (err && esErrorDeRed(err)) return describirError(err);
   if (status === 429 || /rate limit|too many/i.test(msg)) return 'Demasiados intentos. Esperá unos minutos y probá de nuevo.';
   if (/invalid login|invalid credentials/i.test(msg)) return 'Mail o contraseña incorrectos.';
   if (/email not confirmed/i.test(msg)) return 'Falta confirmar el mail.';
@@ -31,6 +34,7 @@ function mensajeError(msg: string, status?: number): string {
 export function LoginGate({ children }: { children: ReactNode }) {
   const nombre = useStore((s) => s.local.nombre);
   const [estado, setEstado] = useState<Estado>(enRecuperacion ? { fase: 'recuperando' } : { fase: 'cargando' });
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     let vivo = true;
@@ -41,7 +45,9 @@ export function LoginGate({ children }: { children: ReactNode }) {
       // Tener cuenta no alcanza: la base decide si es del panel (es_panel()).
       const { data, error } = await supabase.rpc('es_panel');
       if (!vivo || enRecuperacion) return;
-      setEstado(!error && data === true ? { fase: 'ok' } : { fase: 'sin_acceso', email: sesion.user.email ?? '' });
+      // Si no se pudo preguntar (sin conexión, sesión vencida) NO es "sin acceso": se avisa y se deja reintentar.
+      if (error) return setEstado({ fase: 'fallo', mensaje: describirError(error) });
+      setEstado(data === true ? { fase: 'ok' } : { fase: 'sin_acceso', email: sesion.user.email ?? '' });
     }
 
     supabase.auth.getSession().then(({ data }) => {
@@ -62,7 +68,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
       vivo = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [intento]);
 
   if (estado.fase === 'ok') return <>{children}</>;
 
@@ -77,6 +83,14 @@ export function LoginGate({ children }: { children: ReactNode }) {
         {estado.fase === 'cargando' && <p className="text-sm text-mute" role="status">Cargando…</p>}
         {estado.fase === 'sin_sesion' && <FormLogin />}
         {estado.fase === 'recuperando' && <FormNuevaClave onListo={() => setEstado({ fase: 'sin_sesion' })} />}
+        {estado.fase === 'fallo' && (
+          <div className="space-y-3">
+            <p role="alert" className="text-sm font-medium text-red-600">{estado.mensaje}</p>
+            <Button className="w-full" onClick={() => { setEstado({ fase: 'cargando' }); setIntento((n) => n + 1); }}>
+              Reintentar
+            </Button>
+          </div>
+        )}
         {estado.fase === 'sin_acceso' && (
           <div className="space-y-3">
             <p role="alert" className="text-sm font-medium text-red-600">
@@ -109,7 +123,7 @@ function FormLogin() {
     setEnviando(false);
     if (err) {
       setClave('');
-      setError(mensajeError(err.message, err.status));
+      setError(mensajeError(err.message, err.status, err));
     }
   };
 
@@ -119,7 +133,7 @@ function FormLogin() {
     setEnviando(true);
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/panel` });
     setEnviando(false);
-    if (err) return setError(mensajeError(err.message, err.status));
+    if (err) return setError(mensajeError(err.message, err.status, err));
     // Mismo mensaje exista o no el mail, para no revelar quién tiene cuenta.
     setAviso('Si el mail tiene cuenta, te mandamos un link para elegir una contraseña nueva.');
   };
@@ -157,7 +171,7 @@ function FormNuevaClave({ onListo }: { onListo: () => void }) {
     setError(''); setEnviando(true);
     const { error: err } = await supabase.auth.updateUser({ password: clave });
     setEnviando(false);
-    if (err) return setError(mensajeError(err.message, err.status));
+    if (err) return setError(mensajeError(err.message, err.status, err));
     // Limpia el #access_token de la URL y pide entrar con la contraseña nueva.
     window.history.replaceState(null, '', window.location.pathname);
     enRecuperacion = false;

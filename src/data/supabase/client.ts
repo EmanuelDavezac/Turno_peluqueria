@@ -14,7 +14,7 @@ if (!url || !key) {
   throw new Error('Falta VITE_SUPABASE_URL o VITE_SUPABASE_PUBLISHABLE_KEY (ver .env.example).');
 }
 
-const ESPERA_MAX_MS = 15_000;
+const ESPERA_MAX_MS = 10_000;
 
 /** Corta los pedidos colgados: sin esto, una conexión caída dejaría la pantalla cargando para siempre. */
 const fetchConTimeout: typeof fetch = (input, init) => {
@@ -23,4 +23,9 @@ const fetchConTimeout: typeof fetch = (input, init) => {
 };
 
 /** Cliente único. Usa solo la clave pública: lo que puede hacer lo decide RLS. */
-export const supabase = createClient(url, key, { global: { fetch: fetchConTimeout } });
+export const supabase = createClient(url, key, {
+  global: { fetch: fetchConTimeout },
+  // Sin reintentos internos (la librería hace 4 intentos con espera): con la conexión caída el error
+  // tardaba más de un minuto. Falla rápido y la pantalla ofrece "Reintentar".
+  db: { retry: false },
+});
