@@ -3,7 +3,6 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { describirError, esErrorDeRed } from '@/data/errores';
 import { llegoPorRecuperacion, supabase } from '@/data/supabase/client';
-import { useStore } from '@/data/local/store';
 
 // Mientras se elige la contraseña nueva, la sesión del link NO abre el panel.
 let enRecuperacion = llegoPorRecuperacion;
@@ -32,7 +31,15 @@ function mensajeError(msg: string, status?: number, err?: unknown): string {
 
 /** Exige login (Supabase Auth) y pertenecer a usuarios_panel antes de mostrar el panel. */
 export function LoginGate({ children }: { children: ReactNode }) {
-  const nombre = useStore((s) => s.local.nombre);
+  const [nombre, setNombre] = useState('');
+  useEffect(() => {
+    let vivo = true;
+    // El nombre es público. Si no se puede leer, la pantalla de ingreso funciona igual.
+    import('@/data/supabase/negocio').then((m) => m.leerNombreNegocio()).then((n) => vivo && setNombre(n), () => {});
+    return () => {
+      vivo = false;
+    };
+  }, []);
   const [estado, setEstado] = useState<Estado>(enRecuperacion ? { fase: 'recuperando' } : { fase: 'cargando' });
   const [intento, setIntento] = useState(0);
 
@@ -77,7 +84,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
       <div className="w-full max-w-xs space-y-4 rounded-2xl border border-line bg-surface p-6 text-center">
         <Lock className="mx-auto text-mute" size={32} aria-hidden />
         <div>
-          <h1 className="text-xl font-bold">{nombre}</h1>
+          <h1 className="text-xl font-bold">{nombre || 'Turnero'}</h1>
           <p className="text-sm text-mute">Panel de administración</p>
         </div>
         {estado.fase === 'cargando' && <p className="text-sm text-mute" role="status">Cargando…</p>}

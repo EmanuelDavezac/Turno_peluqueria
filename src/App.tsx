@@ -25,9 +25,10 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/panel/horarios" replace />} />
+      {/* La raíz es lo que se comparte con los clientes (Instagram, WhatsApp): va directo a sacar turno. El panel está en /panel. */}
+      <Route path="/" element={<Navigate to="/reservas" replace />} />
       <Route path="/panel" element={<Suspense fallback={null}><Gate><PanelLayout /></Gate></Suspense>}>
-        <Route index element={<Navigate to="horarios" replace />} />
+        <Route index element={<Navigate to="agenda" replace />} />
         <Route path="horarios" element={<HorariosPage />} />
         <Route path="agenda" element={<AgendaPage />} />
         <Route path="caja" element={<CajaPage />} />

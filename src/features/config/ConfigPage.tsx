@@ -9,6 +9,7 @@ import { BACKEND } from '@/data/backend';
 import { describirError } from '@/data/errores';
 import { useAhora, useHoy, useStore } from '@/data/local/store';
 import { useCatalogo, type CatalogoVista } from '@/data/useCatalogo';
+import { useNegocio, type NegocioVista } from '@/data/useNegocio';
 
 /** Los nombres tienen tope en la base (60 caracteres); en la demo local no hay tope. */
 const MAX_NOMBRE = BACKEND === 'supabase' ? 60 : undefined;
@@ -29,7 +30,6 @@ function Seccion({ id, titulo, ayuda, children }: { id: string; titulo: string; 
 
 export function ConfigPage() {
   const s = useStore();
-  const { local } = s;
   const hoy = useHoy();
   const ahora = useAhora();
 
@@ -39,25 +39,7 @@ export function ConfigPage() {
         <h1 className="text-3xl font-bold">Configuración</h1>
       </header>
 
-      <Seccion id="local" titulo="El local">
-        <div className="grid gap-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-2">
-          <div className="text-sm font-medium">
-            <p aria-hidden>Nombre</p>
-            <TextoInput className="mt-1" label="Nombre del local" value={local.nombre} onCommit={(v) => s.setLocal({ nombre: v })} />
-          </div>
-          <div className="text-sm font-medium">
-            <p aria-hidden>Dirección</p>
-            <TextoInput className="mt-1" label="Dirección" value={local.direccion} onCommit={(v) => s.setLocal({ direccion: v })} />
-          </div>
-          {BACKEND === 'local' && (
-            <div className="text-sm font-medium">
-              <p aria-hidden>PIN del panel</p>
-              <TextoInput className="mt-1" label="PIN para entrar al panel" value={local.pin} onCommit={(v) => s.setLocal({ pin: v.trim() })} />
-              <p className="mt-1 text-xs font-normal text-mute">Se pide al abrir el panel. Los clientes nunca lo ven.</p>
-            </div>
-          )}
-        </div>
-      </Seccion>
+      <LocalSeccion />
 
       <CatalogoSecciones />
 
@@ -185,5 +167,42 @@ function CatalogoContenido({ c }: { c: CatalogoVista }) {
 
       <AvisoGuardado guardado={c.guardado} onReintentar={c.reintentarGuardado} />
     </>
+  );
+}
+
+/** Nombre y dirección del local: vienen de la base (o de la demo local), con carga, error y reintento propios. */
+function LocalSeccion() {
+  const negocio = useNegocio();
+  return (
+    <Seccion id="local" titulo="El local">
+      <Pantalla recurso={negocio} texto="Cargando los datos del local…">
+        {(n) => <LocalContenido n={n} />}
+      </Pantalla>
+    </Seccion>
+  );
+}
+
+function LocalContenido({ n }: { n: NegocioVista }) {
+  const pin = useStore((s) => s.local.pin);
+  const setLocalDemo = useStore((s) => s.setLocal);
+  return (
+    <div className="grid gap-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-2">
+      <div className="text-sm font-medium">
+        <p aria-hidden>Nombre</p>
+        <TextoInput className="mt-1" label="Nombre del local" maxLength={BACKEND === 'supabase' ? 80 : undefined} value={n.local.nombre} onCommit={(v) => n.setLocal({ nombre: v })} />
+      </div>
+      <div className="text-sm font-medium">
+        <p aria-hidden>Dirección</p>
+        <TextoInput className="mt-1" label="Dirección" maxLength={BACKEND === 'supabase' ? 160 : undefined} value={n.local.direccion} onCommit={(v) => n.setLocal({ direccion: v })} />
+      </div>
+      {BACKEND === 'local' && (
+        <div className="text-sm font-medium">
+          <p aria-hidden>PIN del panel</p>
+          <TextoInput className="mt-1" label="PIN para entrar al panel" value={pin} onCommit={(v) => setLocalDemo({ pin: v.trim() })} />
+          <p className="mt-1 text-xs font-normal text-mute">Se pide al abrir el panel. Los clientes nunca lo ven.</p>
+        </div>
+      )}
+      <AvisoGuardado guardado={n.guardado} onReintentar={n.reintentarGuardado} />
+    </div>
   );
 }

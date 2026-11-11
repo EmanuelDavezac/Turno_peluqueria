@@ -9,6 +9,7 @@ import { codigoDe, describirError, esErrorDeRed } from '../errores';
 import * as catalogo from './catalogo';
 import { supabase } from './client';
 import * as horarios from './horarios';
+import * as negocio from './negocio';
 import * as agenda from './agenda';
 import * as caja from './caja';
 import * as clientes from './clientes';
@@ -268,7 +269,10 @@ describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
     expect(hist.some((h) => h.fecha === fecha && h.estado === 'atendido')).toBe(true);
 
     // Alta y edición de clientes; el WhatsApp repetido se rechaza con mensaje claro
-    await clientes.crearCliente({ nombre: `${P} Alta`, whatsapp: '3490000991', notas: 'nota de prueba' });
+    // (repetible: si quedó de una corrida anterior, se vuelve a dejar como recién creado)
+    const previo = cl.clientes.find((x) => x.whatsapp === '3490000991');
+    if (previo) await clientes.guardarCliente(previo.id, { nombre: `${P} Alta`, whatsapp: '3490000991', notas: 'nota de prueba' });
+    else await clientes.crearCliente({ nombre: `${P} Alta`, whatsapp: '3490000991', notas: 'nota de prueba' });
     const alta = (await clientes.leerClientes()).clientes.find((x) => x.nombre === `${P} Alta`)!;
     expect(alta).toMatchObject({ whatsapp: '3490000991', notas: 'nota de prueba' });
     await clientes.guardarCliente(alta.id, { nombre: `${P} Alta editada`, whatsapp: '3490000991' });
@@ -277,6 +281,37 @@ describe.skipIf(!process.env.PRUEBA_EMAIL)('remoto (panel + público)', () => {
     expect(ed.notas).toBeUndefined();
     const dup = await clientes.crearCliente({ nombre: `${P} Duplicado`, whatsapp: '3490000991' }).then(() => null, (x) => x);
     expect(describirError(dup)).toMatch(/ya hay un cliente con ese whatsapp/i);
+  });
+
+  it('NEGOCIO: nombre, dirección y recordatorios se guardan, los ve el público y quedan como estaban', async () => {
+    const antes = await negocio.leerNegocio();
+    try {
+      await negocio.guardarNegocio({ direccion: `${P} 123`, recordatorios: { ...antes.recordatorios, h2: false, plantilla: `${P} {nombre} {hora}` } });
+      const d = await negocio.leerNegocio();
+      expect(d.direccion).toBe(`${P} 123`);
+      expect(d.recordatorios).toMatchObject({ h2: false, plantilla: `${P} {nombre} {hora}` });
+      expect(d.nombre).toBe(antes.nombre); // lo que no se mandó no cambia
+
+      // La página pública lee lo mismo
+      const pub = await publico.leerPublico();
+      expect(pub.local.direccion).toBe(`${P} 123`);
+      expect(pub.plantilla).toBe(`${P} {nombre} {hora}`);
+      expect(await negocio.leerNombreNegocio()).toBe(antes.nombre);
+
+      // Un nombre vacío lo rechaza la base
+      const e = await negocio.guardarNegocio({ nombre: '   ' }).then(() => null, (x) => x);
+      expect(codigoDe(e)).toBe('23514');
+
+      // El público no puede escribir
+      const r = await anon.from('negocio').update({ nombre: 'Hack' }).eq('id', true).select('id');
+      expect(r.error?.code).toBe('42501');
+    } finally {
+      await negocio.guardarNegocio({ nombre: antes.nombre, direccion: antes.direccion, recordatorios: antes.recordatorios });
+    }
+    const final = await negocio.leerNegocio();
+    expect({ nombre: final.nombre, direccion: final.direccion, recordatorios: final.recordatorios }).toEqual({
+      nombre: antes.nombre, direccion: antes.direccion, recordatorios: antes.recordatorios,
+    });
   });
 
   it('sin conexión: el error se reconoce como de red y el mensaje es claro', async () => {

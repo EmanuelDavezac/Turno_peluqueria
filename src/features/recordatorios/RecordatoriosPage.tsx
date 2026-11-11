@@ -2,16 +2,27 @@ import { useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Toggle } from '@/components/ui/Toggle';
 import { WhatsAppBubble } from '@/components/WhatsAppBubble';
-import { useStore } from '@/data/local/store';
+import { AvisoGuardado, Pantalla } from '@/components/EstadoCarga';
+import { BACKEND } from '@/data/backend';
+import { useNegocio, type NegocioVista } from '@/data/useNegocio';
 import { PLANTILLA_DEFAULT, VARIABLES, armarMensaje, variablesDesconocidas } from '@/domain/recordatorio';
 
 export function RecordatoriosPage() {
-  const { recordatorios, local, profesionales, setRecordatorios } = useStore();
+  const negocio = useNegocio();
+  return (
+    <Pantalla recurso={negocio} texto="Cargando los recordatorios…">
+      {(n) => <RecordatoriosContenido n={n} />}
+    </Pantalla>
+  );
+}
+
+function RecordatoriosContenido({ n }: { n: NegocioVista }) {
+  const { recordatorios, local, setRecordatorios } = n;
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   const ejemplo = armarMensaje(recordatorios.plantilla, {
     nombre: 'Martín', local: local.nombre, dia: 'viernes 13 de noviembre', hora: '10:30',
-    profesional: profesionales.find((p) => p.activo)?.nombre ?? 'Profesional',
+    profesional: n.profesionalEjemplo,
   });
   const desconocidas = variablesDesconocidas(recordatorios.plantilla);
 
@@ -34,7 +45,9 @@ export function RecordatoriosPage() {
       <header>
         <h1 className="text-3xl font-bold">Recordatorios por WhatsApp</h1>
         <p className="mt-1 max-w-2xl text-mute">
-          En la demo el envío es simulado: se muestra cómo le llegaría el mensaje al cliente.
+          {BACKEND === 'supabase'
+            ? 'Todavía no se envían mensajes automáticos: acá definís el texto y ves cómo le llegaría al cliente.'
+            : 'En la demo el envío es simulado: se muestra cómo le llegaría el mensaje al cliente.'}
         </p>
       </header>
 
@@ -58,6 +71,7 @@ export function RecordatoriosPage() {
             <textarea
               ref={areaRef}
               rows={6}
+              maxLength={600}
               value={recordatorios.plantilla}
               onChange={(e) => setRecordatorios({ plantilla: e.target.value })}
               className="w-full rounded-xl border border-line bg-surface p-3 text-base"
@@ -89,6 +103,8 @@ export function RecordatoriosPage() {
           <p className="text-xs text-mute">Datos de ejemplo: Martín, viernes 13 de noviembre a las 10:30.</p>
         </div>
       </section>
+
+      <AvisoGuardado guardado={n.guardado} onReintentar={n.reintentarGuardado} />
     </div>
   );
 }
