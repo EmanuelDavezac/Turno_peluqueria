@@ -14,5 +14,13 @@ if (!url || !key) {
   throw new Error('Falta VITE_SUPABASE_URL o VITE_SUPABASE_PUBLISHABLE_KEY (ver .env.example).');
 }
 
+const ESPERA_MAX_MS = 15_000;
+
+/** Corta los pedidos colgados: sin esto, una conexión caída dejaría la pantalla cargando para siempre. */
+const fetchConTimeout: typeof fetch = (input, init) => {
+  const limite = AbortSignal.timeout(ESPERA_MAX_MS);
+  return fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, limite]) : limite });
+};
+
 /** Cliente único. Usa solo la clave pública: lo que puede hacer lo decide RLS. */
-export const supabase = createClient(url, key);
+export const supabase = createClient(url, key, { global: { fetch: fetchConTimeout } });

@@ -3,8 +3,11 @@ import { ModalidadBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Segmented } from '@/components/ui/Segmented';
+import { AvisoError, Pantalla } from '@/components/EstadoCarga';
 import { NavFecha } from '@/components/NavFecha';
-import { useHoy, useStore } from '@/data/local/store';
+import { describirError } from '@/data/errores';
+import { useHoy } from '@/data/local/store';
+import { useHorarios, type HorariosVista } from '@/data/useHorarios';
 import { getDia } from '@/domain/getDia';
 import { MODALIDAD_CLASES, MODALIDAD_LABEL, formatFranjas, permiteFila, permiteTurnos } from '@/domain/modalidad';
 import type { Franja, Modalidad } from '@/domain/types';
@@ -14,9 +17,10 @@ import { GrillaTurnos } from './GrillaTurnos';
 
 const ABRIBLES: Modalidad[] = ['turnos', 'llegada', 'mixto'];
 
-function DiaCerrado({ fecha, motivo }: { fecha: string; motivo?: string }) {
-  const addExcepcion = useStore((s) => s.addExcepcion);
+function DiaCerrado({ fecha, motivo, addExcepcion }: { fecha: string; motivo?: string; addExcepcion: HorariosVista['addExcepcion'] }) {
   const [abierto, setAbierto] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
   const [modalidad, setModalidad] = useState<Modalidad>('llegada');
   const [franjas, setFranjas] = useState<Franja[]>([{ desde: '09:00', hasta: '13:00' }]);
 
@@ -29,6 +33,7 @@ function DiaCerrado({ fecha, motivo }: { fecha: string; motivo?: string }) {
       </Button>
 
       <Dialog open={abierto} onClose={() => setAbierto(false)} title="Abrir este día igual">
+        {error && <div className="mb-3 text-left"><AvisoError mensaje={error} onCerrar={() => setError(null)} /></div>}
         <p className="mb-3 text-sm text-mute">Se crea una excepción solo para esta fecha. La semana tipo no cambia.</p>
         <div className="space-y-3 text-left">
           <Segmented
@@ -45,12 +50,21 @@ function DiaCerrado({ fecha, motivo }: { fecha: string; motivo?: string }) {
           </Button>
           <Button
             className="flex-1"
-            onClick={() => {
-              addExcepcion({ fecha, modalidad, franjas, motivo: 'Abierto manualmente' });
-              setAbierto(false);
+            disabled={guardando}
+            onClick={async () => {
+              setError(null);
+              setGuardando(true);
+              try {
+                await addExcepcion({ fecha, modalidad, franjas, motivo: 'Abierto manualmente' });
+                setAbierto(false);
+              } catch (e) {
+                setError(describirError(e));
+              } finally {
+                setGuardando(false);
+              }
             }}
           >
-            Abrir
+            {guardando ? 'Abriendo…' : 'Abrir'}
           </Button>
         </div>
       </Dialog>
@@ -59,7 +73,16 @@ function DiaCerrado({ fecha, motivo }: { fecha: string; motivo?: string }) {
 }
 
 export function AgendaPage() {
-  const { semana, excepciones } = useStore();
+  const horarios = useHorarios();
+  return (
+    <Pantalla recurso={horarios} texto="Cargando la agenda…">
+      {(h) => <AgendaContenido h={h} />}
+    </Pantalla>
+  );
+}
+
+function AgendaContenido({ h }: { h: HorariosVista }) {
+  const { semana, excepciones } = h;
   const hoy = useHoy();
   const [fecha, setFecha] = useState(hoy);
 
@@ -81,7 +104,7 @@ export function AgendaPage() {
         </p>
       </header>
 
-      {dia.modalidad === 'cerrado' && <DiaCerrado fecha={fecha} motivo={dia.excepcion?.motivo} />}
+      {dia.modalidad === 'cerrado' && <DiaCerrado fecha={fecha} motivo={dia.excepcion?.motivo} addExcepcion={h.addExcepcion} />}
 
       <div className={dia.modalidad === 'mixto' ? 'grid gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]' : 'space-y-8'}>
         {permiteTurnos(dia.modalidad) && <GrillaTurnos dia={dia} hoy={hoy} />}

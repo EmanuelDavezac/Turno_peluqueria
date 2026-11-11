@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { useStore, useHoy } from '@/data/local/store';
+import { AvisoError, AvisoGuardado, Pantalla } from '@/components/EstadoCarga';
+import { useHoy } from '@/data/local/store';
+import { describirError } from '@/data/errores';
+import { useHorarios, type HorariosVista } from '@/data/useHorarios';
 import { DIAS_NOMBRE, DIAS_ORDEN } from '@/domain/modalidad';
 import { turnosAfectadosPorFecha, turnosAfectadosPorSemana } from '@/domain/impacto';
 import type { DiaSemana, Excepcion, Franja, Modalidad } from '@/domain/types';
@@ -16,42 +19,77 @@ const plural = (d: string) => (d.endsWith('s') ? d : `${d}s`);
 const FRANJA_DEFAULT: Franja[] = [{ desde: '09:00', hasta: '13:00' }];
 
 export function HorariosPage() {
-  const { semana, excepciones, turnos, setDia, addExcepcion, removeExcepcion, cancelarTurnos } = useStore();
+  const horarios = useHorarios();
+  return (
+    <Pantalla recurso={horarios} texto="Cargando horarios…">
+      {(h) => <HorariosContenido h={h} />}
+    </Pantalla>
+  );
+}
+
+type Fallo = { mensaje: string; reintentar: () => void };
+
+function HorariosContenido({ h }: { h: HorariosVista }) {
+  const { semana, excepciones, setDia, addExcepcion, removeExcepcion } = h;
   const hoy = useHoy();
   const [pendiente, setPendiente] = useState<Pendiente | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [fallo, setFallo] = useState<Fallo | null>(null);
 
   const avisar = (msg: string) => {
     setAviso(msg);
     window.setTimeout(() => setAviso(null), 5000);
   };
 
-  const aplicarSemana = (dia: DiaSemana, modalidad: Modalidad) => {
+  /** Corre una acción contra el servidor; si falla, muestra el motivo con "Reintentar". */
+  const ejecutar = async (accion: () => Promise<void>): Promise<boolean> => {
+    setFallo(null);
+    try {
+      await accion();
+      return true;
+    } catch (e) {
+      setFallo({ mensaje: describirError(e), reintentar: () => void ejecutar(accion) });
+      return false;
+    }
+  };
+
+  const cambiosSemana = (dia: DiaSemana, modalidad: Modalidad) => {
     const actual = semana.find((d) => d.dia === dia)!;
-    setDia(dia, { modalidad, franjas: modalidad !== 'cerrado' && !actual.franjas.length ? FRANJA_DEFAULT : actual.franjas });
+    return { modalidad, franjas: modalidad !== 'cerrado' && !actual.franjas.length ? FRANJA_DEFAULT : actual.franjas };
   };
 
   const onModalidad = (dia: DiaSemana, modalidad: Modalidad) => {
-    const afectados = turnosAfectadosPorSemana(dia, modalidad, turnos, semana, excepciones, hoy);
-    if (afectados.length) setPendiente({ tipo: 'semana', dia, modalidad, ids: afectados.map((t) => t.id) });
-    else aplicarSemana(dia, modalidad);
+    void ejecutar(async () => {
+      // Los turnos se piden ahora (no al abrir la pantalla): así el aviso refleja lo que hay realmente.
+      const turnos = await h.turnos(hoy);
+      const afectados = turnosAfectadosPorSemana(dia, modalidad, turnos, semana, excepciones, hoy);
+      if (afectados.length) setPendiente({ tipo: 'semana', dia, modalidad, ids: afectados.map((t) => t.id) });
+      else setDia(dia, cambiosSemana(dia, modalidad));
+    });
   };
 
   const onAgregarExcepcion = (data: Omit<Excepcion, 'id'>) => {
-    const afectados = turnosAfectadosPorFecha(data.fecha, data.modalidad, turnos);
-    if (afectados.length) setPendiente({ tipo: 'excepcion', data, ids: afectados.map((t) => t.id) });
-    else addExcepcion(data);
+    void ejecutar(async () => {
+      const turnos = await h.turnos(hoy);
+      const afectados = turnosAfectadosPorFecha(data.fecha, data.modalidad, turnos);
+      if (afectados.length) setPendiente({ tipo: 'excepcion', data, ids: afectados.map((t) => t.id) });
+      else await addExcepcion(data);
+    });
   };
 
   const decidir = (d: Decision) => {
     if (!pendiente) return;
-    if (pendiente.tipo === 'semana') aplicarSemana(pendiente.dia, pendiente.modalidad);
-    else addExcepcion(pendiente.data);
-    if (d === 'cancelar') {
-      cancelarTurnos(pendiente.ids);
-      avisar(`Se cancelaron ${pendiente.ids.length} turno(s) y se avisó a los clientes por WhatsApp (simulado).`);
-    }
+    const p = pendiente;
     setPendiente(null);
+    void (async () => {
+      // 1) el cambio de horario (esperando a que se guarde); 2) recién después, cancelar.
+      //    Si falla el paso 2 el horario ya quedó guardado y "Reintentar" repite solo la cancelación.
+      const cambio = p.tipo === 'semana' ? () => h.setDiaYa(p.dia, cambiosSemana(p.dia, p.modalidad)) : () => addExcepcion(p.data);
+      if (!(await ejecutar(cambio))) return;
+      if (d === 'cancelar' && (await ejecutar(() => h.cancelarTurnos(p.ids)))) {
+        avisar(`Se cancelaron ${p.ids.length} turno(s) y se avisó a los clientes por WhatsApp (simulado).`);
+      }
+    })();
   };
 
   const descripcion = !pendiente
@@ -68,6 +106,8 @@ export function HorariosPage() {
           Definí cómo atiende cada día: con turno, por orden de llegada, mixto o cerrado. La página de reservas se actualiza al instante.
         </p>
       </header>
+
+      {fallo && <AvisoError mensaje={fallo.mensaje} onReintentar={fallo.reintentar} onCerrar={() => setFallo(null)} />}
 
       {aviso && (
         <div role="status" className="rounded-xl border border-line bg-sunken px-4 py-3 text-sm font-medium">
@@ -101,7 +141,7 @@ export function HorariosPage() {
               Excepciones por fecha
             </h2>
             <p className="text-sm text-mute">Una excepción pisa la configuración semanal para ese día puntual (feriados, cierres, horarios especiales).</p>
-            <ListaExcepciones excepciones={excepciones} onQuitar={removeExcepcion} />
+            <ListaExcepciones excepciones={excepciones} onQuitar={(id) => void ejecutar(() => removeExcepcion(id))} />
             <ExcepcionForm minFecha={hoy} onAgregar={onAgregarExcepcion} />
           </section>
         </div>
@@ -110,6 +150,8 @@ export function HorariosPage() {
           <VistaPreviaCliente semana={semana} excepciones={excepciones} hoy={hoy} />
         </aside>
       </div>
+
+      <AvisoGuardado guardado={h.guardado} onReintentar={h.reintentarGuardado} />
 
       <ConfirmCambioModalidad
         cantidad={pendiente?.ids.length ?? 0}
