@@ -21,6 +21,7 @@ const ESTADO: Record<string, string> = {
 export function TurnoDialog({ turnoId, agenda, onCerrar }: { turnoId: string | null; agenda: AgendaVista; onCerrar: () => void }) {
   const { turnos, clientes, servicios, profesionales, local, plantilla, setEstadoTurno, cobrarTurno } = agenda;
   const [cobrando, setCobrando] = useState(false);
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState(false);
   const [recordatorio, setRecordatorio] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [ocupado, setOcupado] = useState(false);
@@ -34,6 +35,7 @@ export function TurnoDialog({ turnoId, agenda, onCerrar }: { turnoId: string | n
 
   const cerrar = () => {
     setCobrando(false);
+    setConfirmandoCancelar(false);
     setRecordatorio(null);
     setError('');
     onCerrar();
@@ -86,7 +88,23 @@ export function TurnoDialog({ turnoId, agenda, onCerrar }: { turnoId: string | n
           </div>
         )}
 
-        {vivo && (
+        {vivo && confirmandoCancelar && (
+          <div className="mt-5 space-y-3" role="alertdialog" aria-label="Confirmar cancelación">
+            <p className="text-sm font-medium">
+              ¿Cancelar el turno de {cliente?.nombre ?? 'este cliente'} a las {t.hora}? El horario va a quedar libre para otros clientes.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variante="ghost" disabled={ocupado} onClick={() => setConfirmandoCancelar(false)}>
+                No, volver
+              </Button>
+              <Button variante="danger" disabled={ocupado} onClick={() => void hacer(() => setEstadoTurno(t.id, 'cancelado'))}>
+                {ocupado ? 'Guardando…' : 'Sí, cancelar'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {vivo && !confirmandoCancelar && (
           <div className="mt-5 grid grid-cols-2 gap-2">
             {t.estado === 'reservado' && (
               <Button variante="ghost" disabled={ocupado} onClick={() => void hacer(() => setEstadoTurno(t.id, 'llego'))}>
@@ -100,8 +118,8 @@ export function TurnoDialog({ turnoId, agenda, onCerrar }: { turnoId: string | n
             <Button variante="ghost" disabled={ocupado} onClick={() => void hacer(() => setEstadoTurno(t.id, 'ausente'))}>
               No vino
             </Button>
-            <Button variante="danger" className="col-span-2" disabled={ocupado} onClick={() => void hacer(() => setEstadoTurno(t.id, 'cancelado'))}>
-              {ocupado ? 'Guardando…' : 'Cancelar turno'}
+            <Button variante="danger" className="col-span-2" disabled={ocupado} onClick={() => setConfirmandoCancelar(true)}>
+              Cancelar turno
             </Button>
           </div>
         )}
